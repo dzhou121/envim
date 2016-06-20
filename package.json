@@ -1,0 +1,11 @@
+{
+    "name": "envim",
+    "version": "0.1.0",
+    "main": "bootstrap.js",
+    "devDependencies": {
+        "electron-prebuilt": "^1.2.2"
+    },
+    "scripts": {
+        "start": "electron ."
+    }
+}
