@@ -8,7 +8,7 @@ class Cursor extends Component {
 
     render() {
         console.log("cursor render")
-        const { editor, left, top } = this.props
+        const { editor, left, top, padding } = this.props
 
         var pos = editor.get('cursorPos')
         var fontSize = editor.get('fontSize')
@@ -19,8 +19,9 @@ class Cursor extends Component {
             width: fontSize / 2,
             height: fontSize * lineHeight,
             position: "absolute",
-            left: left * fontSize / 2,
-            backgroundColor: fg,
+            left: left * fontSize / 2 + padding,
+            backgroundColor: "#fdf6e3",
+            opacity: 0.5,
         }
         if (top != undefined) {
             style.top = top * fontSize * lineHeight

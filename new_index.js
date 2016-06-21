@@ -238,7 +238,6 @@ class Editor {
     }
 
     spansPut(spans, col, text, width) {
-        // console.log("-------------------")
         var chars = Immutable.List()
         var line = Immutable.List()
         var highlight = this.state.editor.get("highlight")
@@ -246,30 +245,21 @@ class Editor {
         var affectedChars = []
         var affectedStart = -1
         var affectedEnd = -1
-        // spans.forEach((span, i) => {
         for (var i = 0; i < spans.size; i++) {
             var span = spans.get(i)
             if (span == undefined && affectedStart == -1 && i == col) {
                 affectedStart = i
             }
             if (span != undefined) {
-                // console.log(span.get("text"))
-                // console.log(affectedStart)
                 var spanEnd = i + span.get("text").length
-                // console.log(i)
-                // console.log(spanEnd)
-                // console.log(col)
                 if ((i <= col && spanEnd >= col) && affectedStart == -1) {  
                     affectedStart = i
                 }
-                // console.log(affectedStart)
                 if (i <= end && spanEnd >= end) {
                     affectedEnd = spanEnd
                 }
                 if (affectedStart != -1) {
-                    // console.log(span.get("text"))
                     span.get("text").split('').forEach((char, index) => {
-                        // console.log(char)
                         chars = chars.set(i + index, {
                             char: char,
                             highlight: span.get("highlight"),
@@ -306,18 +296,6 @@ class Editor {
             }
         }
 
-        // console.log(spans.toJS())
-        // console.log("------------------")
-        // console.log(affectedStart)
-        // console.log(affectedEnd)
-        // console.log(chars.toJS())
-        // console.log(spans.toJS())
-        // console.log(affectedStart)
-        // console.log(affectedEnd)
-        // console.log(lastIndex)
-        // console.log(text)
-        // var newSpans = Immutable.List()
-        // chars.forEach((char, i) => {
         for (var i = affectedStart; i < affectedEnd; i++){
             var char = chars.get(i)
             if (spans.get(lastIndex) === undefined) {

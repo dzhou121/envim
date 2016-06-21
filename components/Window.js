@@ -21,6 +21,7 @@ class Window extends Component {
         }
 
         var lineHeight = 14 * 1.5
+        var padding = 0
 
         var pos = win.get("pos")
         var left = 0
@@ -40,16 +41,17 @@ class Window extends Component {
 
         if (left > 0) {
             style.borderLeft = "1px solid #000000"
-            style.paddingLeft = "6px"
+            style.paddingLeft = 6
+            padding = 6
         }
 
         var linesHtml = []
         if (cursor) {
             var pos = editor.get("cursorPos")
             var winPos = win.get("pos")
-            var left = pos[1] - winPos.get(1) + 1
+            var left = pos[1] - winPos.get(1)
             var top = pos[0] - winPos.get(0)
-            linesHtml.push(<Cursor key={"cursor"} left={left} top={top} editor={editor} />)
+            linesHtml.push(<Cursor key={"cursor"} padding={padding} left={left} top={top} editor={editor} />)
         }
         lines.map((line, i) => {
             linesHtml.push(<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} />)

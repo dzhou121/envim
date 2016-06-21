@@ -24,10 +24,11 @@ export default class Cmd extends Component {
         var height = 2
         var top = 0
         var left = (editor.get("width") - width) / 2
+        var padding = 7
         var style = {
             width: width * 7,
             // height: height * lineHeight,
-            padding: 7,
+            padding: padding,
             left: left * 7,
             top: top * lineHeight,
             position: "fixed",
@@ -43,8 +44,8 @@ export default class Cmd extends Component {
         if (cursor) {
             var pos = editor.get("cursorPos")
             var winPos = win.get("pos")
-            var left = pos[1] - winPos.get(1) + 1
-            cmd.push(<Cursor key={"cursor"} left={left} editor={editor} />)
+            var left = pos[1] - winPos.get(1)
+            cmd.push(<Cursor key={"cursor"} padding={padding} left={left} editor={editor} />)
         }
         lines.map((line, i) => {
             if (line != undefined) {
