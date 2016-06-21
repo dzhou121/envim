@@ -8,7 +8,7 @@ export default class Span extends Component {
     }
 
     shouldComponentUpdate(nextProps, nextState) {
-        return nextProps.span != this.props.span
+        return (nextProps.span != this.props.span) || (nextProps.last != this.props.last)
     }
 
     render() {

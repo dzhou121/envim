@@ -20,11 +20,13 @@ export default class Line extends Component {
 
         var spans = []
         var lastIndex = 0
-        line.forEach((span, i) => {
+        for (var i = line.size -1; i >= 0; i--) {
+            var span = line.get(i)
             if (span != undefined) {
                 lastIndex = i
+                break
             }
-        })
+        }
 
         line.forEach((span, i) => {
             if (span != undefined) {

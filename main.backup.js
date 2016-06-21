@@ -35,7 +35,6 @@ attach(nvim_proc.stdin, nvim_proc.stdout, function (err, nvim) {
     nvim.on('notification', function (method, args) {
         // console.log(method);
         // console.log(args);
-
         for (i = 0; i < args.length; i++) {
             var arg = args[i];
             var e = arg[0];

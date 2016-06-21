@@ -13,7 +13,6 @@ class Window extends Component {
     }
 
     render() {
-        console.log("-----------------------------")
         const { win, bg, fg, editor, cursor } = this.props
         var lines = win.get("lines")
         if (lines === undefined || lines.length == 0) {
@@ -36,6 +35,7 @@ class Window extends Component {
             left: left,
             top: win.get("pos").get(0) * lineHeight,
             backgroundColor: bg,
+            boxShadow: "inset -3px 0 0 rgba(0, 0, 0, 0.05)",
             color: fg,
         }
 

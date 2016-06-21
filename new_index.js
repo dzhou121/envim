@@ -17,6 +17,7 @@ var lock = new ReadWriteLock()
 var editor = Immutable.Map({
     width: 120,
     height: 30,
+    mode: "normal",
     lineHeight: 1.5,
     fontSize: 14,
     statusLine: true,
@@ -121,9 +122,11 @@ function uiAttach() {
 function onNotify() {
     var nvim = EnvimState.nvim
     nvim.on('notification', function(method, args) {
-        lock.writeLock(function (release) {
-            handleNotification(args, release)
-        });
+        if (args.length > 0) {
+            lock.writeLock(function (release) {
+                handleNotification(args, release)
+            });
+        }
     })
 }
 
@@ -167,7 +170,12 @@ class Editor {
                 case 'scroll':
                     this.scroll(arg.slice(1))
                     break
+                case 'mode_change':
+                    this.modeChange(arg.slice(1))
+                    break
                 default:
+                    console.log(e)
+                    console.log(arg)
                     break
             }
         })
@@ -175,9 +183,104 @@ class Editor {
         this.release()
     }
 
+    concatWin(args) {
+        this.nvim.getTabpages().then(tabs => {
+            this.nvim.getCurrentTabpage().then(tab => {
+                tab.getWindows().then(windows => {
+                    Promise.all(
+                        windows.map((win, index) => {
+                            return Promise.props({
+                                height: win.getHeight(),
+                                width: win.getWidth(),
+                                pos: win.getPosition(),
+                            })
+                        })
+                    ).then(value => {
+                        var windows = Immutable.fromJS(value.map((win, index) => {
+                            return {
+                                height: win.height,
+                                width: win.width,
+                                pos: win.pos,
+                                end: [win.pos[0] + win.height, win.pos[1] + win.width],
+                            }
+                        }))
+
+                        windows = windows.push(Immutable.Map({
+                            height: this.state.editor.get("cmdheight"),
+                            width: this.state.editor.get("width"),
+                            pos: this.state.editor.get("cmdPos"),
+                            end: this.state.editor.get("cmdEnd"),
+                            cmd: true,
+                        }))
+
+                        var oldWindows = this.state.editor.get("windows")
+
+                        var changed = false
+
+                        if (oldWindows.size != windows.size) {
+                            changed = true
+                        } else {
+                            for (var i = 0; i < windows.size; i++) {
+                                var win = windows.get(i)
+                                var oldWin = oldWindows.get(i)
+                                var pos = win.get("pos")
+                                var width = win.get("width")
+                                var height = win.get("height")
+                                var oldPos = oldWin.get("pos")
+                                var oldWidth = oldWin.get("width")
+                                var oldHeight = oldWin.get("height")
+                                if (pos.get(0) != oldPos.get(0) || pos.get(1) != oldPos.get(1) || width != oldWidth || height != oldHeight) {
+                                    changed = true
+                                    break
+                                }
+                            }
+                        }
+
+                        if (changed) {
+                            windows = windows.map(win => {
+                                for (var i = 0; i < oldWindows.size; i++) {
+                                    var oldWin = oldWindows.get(i)
+                                    var pos = win.get("pos")
+                                    var width = win.get("width")
+                                    var oldPos = oldWin.get("pos")
+                                    if (pos.get(0) == oldPos.get(0) && pos.get(1) == oldPos.get(1)) {
+                                        win = win.merge({lines: oldWin.get("lines")})
+                                        break
+                                    }
+                                }
+                                return win
+                            })
+                            this.state.editor = this.state.editor.set("windows", windows)
+                            console.log(this.state.editor.toJS())
+                            console.log("windows changed")
+                        } else {
+                            console.log("windows not changed")
+                        }
+                        // windows = windows.map(win => {
+                        //     var pos = win.get(pos)
+
+                        // })
+
+                        // this.state.editor = this.state.editor.merge(Immutable.fromJS({
+                        //     windows: windows,
+                        //     tabs: tabs,
+                        // }))
+                        this.parseArgs(args)
+                    })
+
+                })
+            })
+        })
+    }
+
     redraw(args) {
         if (this.state.editor.get('windows') != undefined) {
-            this.parseArgs(args)
+            // this.parseArgs(args)
+            if (args.length > 100) {
+                this.concatWin(args)
+            } else {
+                this.parseArgs(args)
+            }
         } else {
             this.nvim.getTabpages().then(tabs => {
                 this.nvim.getCurrentTabpage().then(tab => {
@@ -245,6 +348,36 @@ class Editor {
         var affectedChars = []
         var affectedStart = -1
         var affectedEnd = -1
+        if (spans.size > width) {
+            var newSpans = Immutable.List()
+            for (var i = 0; i <= width; i++) {
+                var span = spans.get(i)
+                if (span != undefined) {
+                    newSpans = newSpans.set(i, span)
+                }
+            }
+            spans = newSpans
+        }
+        // for (var i = spans.size -1; i >= 0; i--) {
+        //     var span = spans.get(i)
+        //     if (span != undefined) {
+        //         var spanText = span.get("text")
+        //         if ((spanText.length + i) > width) {
+        //             console.log(spanText)
+        //             var newSpanText = ""
+        //             for (var j = i; j < width; j ++) {
+        //                 newSpanText = newSpanText + spanText[j - i]
+        //             }
+        //             console.log("old text")
+        //             console.log(spanText)
+        //             console.log("new text")
+        //             console.log(newSpanText)
+        //             span = span.set("text", newSpanText)
+        //             spans = spans.set(i, span)
+        //         }
+        //         break
+        //     }
+        // }
         for (var i = 0; i < spans.size; i++) {
             var span = spans.get(i)
             if (span == undefined && affectedStart == -1 && i == col) {
@@ -304,8 +437,12 @@ class Editor {
                 } else {
                     spans = spans.set(i, Immutable.Map({highlight: char.highlight, text: char.char}))
                 }
+                // lastIndex = i
             } else {
                 var span = spans.get(lastIndex)
+                if (span == null) {
+                    console.log(spans.toJS())
+                }
                 var spanHighlight = span.get("highlight")
                 var currentHighlight = {}
                 var charContent = " "
@@ -455,6 +592,11 @@ class Editor {
         currentWin = currentWin.set("lines", lines)
         windows = windows.set(currentWinIndex, currentWin)
         this.state.editor = this.state.editor.set("windows", windows)
+    }
+
+    modeChange(args) {
+        var mode = args[0][0]
+        this.state.editor = this.state.editor.set("mode", mode)
     }
 }
 
