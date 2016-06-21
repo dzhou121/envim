@@ -8,6 +8,7 @@ import configureStore from './store/configureStore'
 
 const store = configureStore()
 store.dispatch(getInitEditor())
+store.dispatch(getInitEditor())
 
 ReactDOM.render(
   <Provider store={store}>

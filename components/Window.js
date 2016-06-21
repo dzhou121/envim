@@ -1,47 +1,42 @@
 import React, { Component } from 'react'
+import PureRenderMixin from 'react-addons-pure-render-mixin';
 import * as _ from 'lodash'
+import Line from './Line'
 
 class Window extends Component {
     constructor(props, context) {
         super(props, context)
     }
 
+    shouldComponentUpdate(nextProps, nextState) {
+        return nextProps.win != this.props.win
+    }
+
     render() {
+        console.log("-----------------------------")
         const { win, bg, fg } = this.props
-        if (win.lines === undefined || win.lines.length == 0) {
+        var lines = win.get("lines")
+        if (lines === undefined || lines.length == 0) {
             return <div></div>
         }
 
         var lineHeight = 14 * 1.5
 
         var style = {
-            width: (win.width * 7).toString().concat("px"),
-            height: (win.height * lineHeight).toString().concat("px"),
+            width: win.get("width") * 7,
+            height: win.get("height") * lineHeight,
             position: "fixed",
-            left: win.pos[1] * 7,
-            top: win.pos[0] * lineHeight,
+            left: win.get("pos").get(1) * 7,
+            top: win.get("pos").get(0) * lineHeight,
             backgroundColor: bg,
             color: fg,
         }
 
         return (
             <div style={style}>
-                {win.lines.map((line, i) => {
-                    if (line === undefined) {
-                        return <pre key={i}></pre>
-                    }
-                    var a = []
-                    for (var j = 0; j < win.width; j++) {
-                        if (line[j] === undefined) {
-                            a.push(" ")
-                        } else {
-                            a.push(line[j])
-                        }
-                    }
-                    return <pre key={i}>{_.join(a, '')}</pre>
-                }
-                    // <pre key={i}>{_.join(line, '')}</pre>
-                )}
+                {lines.map((line, i) => {
+                    return (<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} />)
+                })}
             </div>)
     }
 }

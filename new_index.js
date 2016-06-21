@@ -1,5 +1,6 @@
 import { attach } from 'promised-neovim-client'
 import {spawn } from 'child_process'
+import Immutable from 'immutable'
 import * as Promise from 'bluebird'
 import * as _ from 'lodash'
 import React from 'react';
@@ -8,19 +9,23 @@ import ReadWriteLock from 'rwlock'
 import Window from './components/Window'
 import Cursor from './components/Cursor'
 
+var uniqueId = 0
+
 var lock = new ReadWriteLock()
 
-var EnvimState = {
-    editor: {
-        width: 120,
-        height: 30,
-        lineHeight: 1.5,
-        fontSize: 14,
-        statusLine: true,
-        cmdheight: 1,
-        cursorPos: [0, 0],
-    }
-}
+var editor = Immutable.Map({
+    width: 120,
+    height: 30,
+    lineHeight: 1.5,
+    fontSize: 14,
+    statusLine: true,
+    cmdheight: 1,
+    cursorPos: [0, 0],
+    highlight: {},
+    scroll: [],
+})
+
+var EnvimState = {editor: editor}
 
 var EnvimClass
 
@@ -37,11 +42,11 @@ var EnvimEditor = React.createClass({
     render: function() {
         var wins = []
         var editor = this.state.editor
-        var windows = editor.windows
+        var windows = editor.get('windows')
 
         if (windows !== undefined) {
             wins = windows.map((win, i) =>
-                <Window key={i} win={win} bg={editor.bg} fg={editor.fg} />
+                <Window key={i} win={win} bg={editor.get("bg")} fg={editor.get("fg")} />
             )
         }
 
@@ -91,7 +96,7 @@ function initEditor() {
 function uiAttach() {
     var nvim = EnvimState.nvim
     var editor = EnvimState.editor
-    nvim.uiAttach(editor.width, editor.height, true, function() {
+    nvim.uiAttach(editor.get('width'), editor.get('height'), true, function() {
     })
     onNotify()
 }
@@ -113,7 +118,7 @@ function handleNotification(args, release) {
 class Editor {
     constructor(release) {
         this.nvim = EnvimState.nvim
-        this.editor = EnvimState.editor
+        this.state = EnvimState
         this.release = release
     }
 
@@ -123,34 +128,38 @@ class Editor {
             switch (e) {
                 case 'cursor_goto':
                     this.cursorGoto(arg.slice(1))
-                    this.changed = true
                     break
                 case 'put':
                     this.put(arg.slice(1))
-                    this.changed = true
                     break
                 case 'update_fg':
-                    this.editor.fg = this.decToHex(arg[1][0])
-                    this.changed = true
+                    this.state.editor = this.state.editor.set("fg", this.decToHex(arg[1][0]))
                     break
                 case 'update_bg':
-                    this.editor.bg = this.decToHex(arg[1][0])
-                    this.changed = true
+                    this.state.editor = this.state.editor.set("bg", this.decToHex(arg[1][0]))
+                    break
+                case 'highlight_set':
+                    this.highlightSet(arg.slice(1))
+                    break
+                case 'eol_clear':
+                    this.eolClear(arg.slice(1))
+                    break
+                case 'set_scroll_region':
+                    this.setScrollRegion(arg.slice(1))
+                    break
+                case 'scroll':
+                    this.scroll(arg.slice(1))
                     break
                 default:
                     break
             }
         })
-        if (this.changed) {
-            EnvimClass.setState(EnvimState)
-            // console.log(EnvimState)
-            // console.log("redraw")
-        }
+        EnvimClass.setState(EnvimState)
         this.release()
     }
 
     redraw(args) {
-        if (this.editor.windows != undefined) {
+        if (this.state.editor.get('windows') != undefined) {
             this.parseArgs(args)
         } else {
             this.nvim.getTabpages().then(tabs => {
@@ -165,15 +174,15 @@ class Editor {
                                 })
                             })
                         ).then(value => {
-                            this.editor.windows = value.map((win, index) => {
+                            var windows = Immutable.fromJS(value.map((win, index) => {
                                     return {
                                         height: win.height,
                                         width: win.width,
                                         pos: win.pos,
                                         end: [win.pos[0] + win.height, win.pos[1] + win.width],
                                     }
-                                })
-                            this.editor.tabs = tabs
+                                }))
+                            this.state.editor = this.state.editor.merge(Immutable.fromJS({windows: windows, tabs: tabs}))
                             this.parseArgs(args)
                         })
 
@@ -184,46 +193,233 @@ class Editor {
     }
 
     cursorGoto(args) {
-        this.editor.cursorPos = args[0]
+        this.state.editor = this.state.editor.set("cursorPos", args[0])
     }
 
-    winCursorPos() {
+    winCursorPos(pos) {
         var currentIndex = 0
-        var pos = this.editor.cursorPos
-        this.editor.windows.forEach((win, index) => {
-            if (pos[0] >= win.pos[0] && pos[0] <= win.end[0] && pos[1] >= win.pos[1] && pos[1] <= win.end[1]) {
+        this.state.editor.get("windows").forEach((win, index) => {
+            var winPos = win.get("pos")
+            var winEnd = win.get("end")
+            if (pos[0] >= winPos.get(0) && pos[0] <= winEnd.get(0) && pos[1] >= winPos.get(1) && pos[1] <= winEnd.get(1)) {
                 currentIndex = index
             }
         })
         return currentIndex
     }
 
-    put(args) {
-        var windows = this.editor.windows
-        var cursorPos = this.editor.cursorPos
-        var currentWinIndex = this.winCursorPos()
-        var currentWin = windows[currentWinIndex]
-        var currentWinPos = currentWin.pos
-        var currentWinCursorPos = [
-            cursorPos[0] - currentWinPos[0],
-            cursorPos[1] - currentWinPos[1],
-        ]
-        var lines = []
-        var line = []
-        if (currentWin.lines !== undefined) {
-            lines = _.cloneDeep(currentWin.lines)
+    spansPut(spans, col, text, width) {
+        // console.log("-------------------")
+        var chars = Immutable.List()
+        var line = Immutable.List()
+        var highlight = this.state.editor.get("highlight")
+        var end = col + text.length
+        var affectedChars = []
+        var affectedStart = -1
+        var affectedEnd = -1
+        // spans.forEach((span, i) => {
+        for (var i = 0; i < spans.size; i++) {
+            var span = spans.get(i)
+            if (span == undefined && affectedStart == -1 && i == col) {
+                affectedStart = i
+            }
+            if (span != undefined) {
+                // console.log(span.get("text"))
+                // console.log(affectedStart)
+                var spanEnd = i + span.get("text").length
+                // console.log(i)
+                // console.log(spanEnd)
+                // console.log(col)
+                if ((i <= col && spanEnd >= col) && affectedStart == -1) {  
+                    affectedStart = i
+                }
+                // console.log(affectedStart)
+                if (i <= end && spanEnd >= end) {
+                    affectedEnd = spanEnd
+                }
+                if (affectedStart != -1) {
+                    // console.log(span.get("text"))
+                    span.get("text").split('').forEach((char, index) => {
+                        // console.log(char)
+                        chars = chars.set(i + index, {
+                            char: char,
+                            highlight: span.get("highlight"),
+                        })
+                    })
+                    spans = spans.set(i, undefined)
+                }
+                if (affectedEnd != -1) {
+                    break
+                }
+            }
         }
-        if (lines[currentWinCursorPos[0]] === undefined) {
-            lines[currentWinCursorPos[0]] = []
+        if (affectedStart == -1) {
+            affectedStart = col
         }
-        line = lines[currentWinCursorPos[0]]
-        var c = currentWinCursorPos[1]
-        args.forEach((arg, index) => {
-            line[c + index] = arg[0]
+        if ((col + text.length) > affectedEnd) {
+            affectedEnd = col + text.length
+        }
+        text.forEach((char, i) => {
+            if ((col + i) < width) {
+                chars = chars.set(col + i, {
+                    char: char,
+                    highlight: highlight,
+                })
+            }
         })
-        this.editor.windows[currentWinIndex].lines = lines
-        var pos = cursorPos.slice()
-        this.editor.cursorPos = [pos[0], pos[1] + args.length]
+
+        var lastIndex = 0
+        for (var i = affectedStart; i > 0; i--) {
+            var span = spans.get(i)
+            if (span != undefined) {
+                lastIndex = i
+                break
+            }
+        }
+
+        // console.log(spans.toJS())
+        // console.log("------------------")
+        // console.log(affectedStart)
+        // console.log(affectedEnd)
+        // console.log(chars.toJS())
+        // console.log(spans.toJS())
+        // console.log(affectedStart)
+        // console.log(affectedEnd)
+        // console.log(lastIndex)
+        // console.log(text)
+        // var newSpans = Immutable.List()
+        // chars.forEach((char, i) => {
+        for (var i = affectedStart; i < affectedEnd; i++){
+            var char = chars.get(i)
+            if (spans.get(lastIndex) === undefined) {
+                if (char === undefined) {
+                    spans = spans.set(i, Immutable.Map({highlight: {}, text: " "}))
+                } else {
+                    spans = spans.set(i, Immutable.Map({highlight: char.highlight, text: char.char}))
+                }
+            } else {
+                var span = spans.get(lastIndex)
+                var spanHighlight = span.get("highlight")
+                var currentHighlight = {}
+                var charContent = " "
+                if (char != undefined) {
+                    currentHighlight = char.highlight
+                    charContent = char.char
+                }
+                if (currentHighlight.foreground != spanHighlight.foreground || currentHighlight.background != spanHighlight.background) {
+                    var newSpan = Immutable.Map({highlight: currentHighlight, text: charContent})
+                    spans = spans.set(i, newSpan)
+                    lastIndex = i
+                } else {
+                    var text = span.get("text") + charContent
+                    span = span.merge({text: text})
+                    spans = spans.set(lastIndex, span)
+                }
+            }
+        }
+        // console.log(spans.toJS())
+        // console.log("-------------------")
+        return spans
+    }
+
+    put(args) {
+        var windows = this.state.editor.get("windows")
+        var cursorPos = this.state.editor.get("cursorPos")
+        var currentWinIndex = this.winCursorPos(cursorPos)
+        var currentWin = windows.get(currentWinIndex)
+        var currentWinPos = currentWin.get("pos")
+        var currentWinCursorPos = [
+            cursorPos[0] - currentWinPos.get(0),
+            cursorPos[1] - currentWinPos.get(1),
+        ]
+
+        if (currentWin.get("lines") === undefined) {
+            currentWin = currentWin.set("lines", Immutable.List())
+        }
+
+        var lines = currentWin.get("lines")
+        if (lines.get(currentWinCursorPos[0]) === undefined) {
+            uniqueId = uniqueId + 1
+            lines = lines.set(currentWinCursorPos[0], Immutable.Map({
+                uniqueId: uniqueId,
+                spans: Immutable.List(),
+            }))
+        }
+        var line = lines.get(currentWinCursorPos[0])
+        var spans = line.get("spans")
+        var c = currentWinCursorPos[1]
+        var width = currentWin.get("width")
+        spans = this.spansPut(spans, c, args.map(arg => {return arg[0]}), width)
+        line = line.set("spans", spans)
+        // var span = Immutable.Map({
+        //     col: c,
+        //     text: _.join(args.map(arg => {return arg[0]}), ''),
+        //     highlight: Object.assign({}, this.state.editor.get("highlight")),
+        // })
+        // console.log(span.toJS())
+        // line = line.set(c, span)
+        // for (var index = 0; index < args.length; index ++) {
+        //     // var char = line.get(c + index)
+        //     // if (char === undefined) {
+        //     //     char = Immutable.Map({char: arg[0], highlight: this.state.editor.get("highlight")})
+        //     //     line = line.set(c + index, char)
+        //     // } else if (char.get("char") != arg[0]) {
+        //     //     char = char.set("char", arg[0])
+        //     //     line = line.set(c + index, char)
+        //     // }
+        //     // if (char === undefined || char.get("char") != arg[0]) {
+        //     //     char = char.set("char", arg[0])
+        //     //     line = line.set(c + index, char)
+        //     // }
+        //     if ((c + index) >= currentWin.get("width")) {
+        //         break
+        //     }
+        //     var arg = args[index]
+        //     line = line.set(c + index, Immutable.Map({char: arg[0], highlight: this.state.editor.get("highlight")}))
+        // }
+        lines = lines.set(currentWinCursorPos[0], line)
+        currentWin = currentWin.set("lines", lines)
+        windows = windows.set(currentWinIndex, currentWin)
+        this.state.editor = this.state.editor.set("windows", windows)
+        this.state.editor = this.state.editor.set("cursorPos", [cursorPos[0], cursorPos[1] + args.length])
+    }
+
+    highlightSet(args) {
+        var newHighlight = this.state.editor.get("highlight")
+        args.forEach((arg) => {
+            var highlight = arg[0]
+            if (Object.keys(highlight).length == 0) {
+                newHighlight = {}
+            } else {
+                Object.keys(highlight).forEach(key => {
+                    newHighlight[key] = highlight[key]
+                })
+                if (newHighlight.reverse) {
+                    var foreground = newHighlight.foreground
+                    newHighlight.foreground = newHighlight.background
+                    newHighlight.background = foreground
+                }
+            }
+        })
+        if (newHighlight.foreground != undefined) {
+            newHighlight.foreground = this.decToHex(newHighlight.foreground)
+        }
+        if (newHighlight.background != undefined) {
+            newHighlight.background = this.decToHex(newHighlight.background)
+        }
+
+        this.state.editor = this.state.editor.set("highlight", newHighlight)
+    }
+
+    eolClear(args) {
+        args = []
+        var cursorPos = this.state.editor.get("cursorPos")
+        var width = this.state.editor.get("width")
+        for (var i = cursorPos[1]; i < width; i++) {
+            args.push([" "])
+        }
+        // this.state.editor = this.state.editor.set("highlight", {})
+        this.put(args)
     }
 
     decToHex(n) {
@@ -233,6 +429,49 @@ class Editor {
             hex = "0" + hex;
         }
         return "#".concat(hex);
+    }
+
+    setScrollRegion(args) {
+        this.state.editor = this.state.editor.set("scroll", args[0])
+    }
+
+    scroll(args) {
+        var n = args[0][0]
+        var windows = this.state.editor.get("windows")
+        var scrollRegion = this.state.editor.get("scroll")
+        var pos = [scrollRegion[0], scrollRegion[3]]
+        var currentWinIndex = this.winCursorPos(pos)
+        var currentWin = windows.get(currentWinIndex)
+        var height = currentWin.get("height")
+        var lines = Immutable.List()
+        var oldLines = currentWin.get("lines")
+        if (n > 0) {
+            for (var i = n; i < height; i++) {
+                lines = lines.push(oldLines.get(i))
+            }
+            for (var i = 0; i < n; i++) {
+                uniqueId = uniqueId + 1
+                lines = lines.push(Immutable.Map({
+                    uniqueId: uniqueId,
+                    spans: Immutable.List(),
+                }))
+            }
+        } else {
+            lines = Immutable.List()
+            for (var i = 0; i > n; i--) {
+                uniqueId = uniqueId + 1
+                lines = lines.push(Immutable.Map({
+                    uniqueId: uniqueId,
+                    spans: Immutable.List(),
+                }))
+            }
+            for (var i = 0; i < height + n; i++) {
+                lines = lines.push(oldLines.get(i))
+            }
+        }
+        currentWin = currentWin.set("lines", lines)
+        windows = windows.set(currentWinIndex, currentWin)
+        this.state.editor = this.state.editor.set("windows", windows)
     }
 }
 

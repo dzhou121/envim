@@ -9,15 +9,18 @@ class Cursor extends Component {
     render() {
         const { editor } = this.props
 
-        var pos = editor.cursorPos
+        var pos = editor.get('cursorPos')
+        var fontSize = editor.get('fontSize')
+        var lineHeight = editor.get('lineHeight')
+        var fg = editor.get('fg')
 
         var style = {
-            width: editor.fontSize / 2,
-            height: editor.fontSize * editor.lineHeight,
+            width: fontSize / 2,
+            height: fontSize * lineHeight,
             position: "fixed",
-            left: pos[1] * editor.fontSize / 2,
-            top: pos[0] * editor.fontSize * editor.lineHeight,
-            backgroundColor: editor.fg,
+            left: pos[1] * fontSize / 2,
+            top: pos[0] * fontSize * lineHeight,
+            backgroundColor: fg,
         }
 
         return (
