@@ -1,7 +1,7 @@
 import React, { Component } from 'react'
-import PureRenderMixin from 'react-addons-pure-render-mixin';
 import * as _ from 'lodash'
 import Line from './Line'
+import Cursor from './Cursor'
 
 class Window extends Component {
     constructor(props, context) {
@@ -9,12 +9,12 @@ class Window extends Component {
     }
 
     shouldComponentUpdate(nextProps, nextState) {
-        return nextProps.win != this.props.win
+        return (nextProps.win != this.props.win) || (this.props.cursor)
     }
 
     render() {
         console.log("-----------------------------")
-        const { win, bg, fg } = this.props
+        const { win, bg, fg, editor, cursor } = this.props
         var lines = win.get("lines")
         if (lines === undefined || lines.length == 0) {
             return <div></div>
@@ -22,22 +22,40 @@ class Window extends Component {
 
         var lineHeight = 14 * 1.5
 
+        var pos = win.get("pos")
+        var left = 0
+        if (pos.get(1) > 0) {
+            var left = (pos.get(1) - 1 ) * 7
+        }
+
         var style = {
             width: win.get("width") * 7,
             height: win.get("height") * lineHeight,
             position: "fixed",
-            left: win.get("pos").get(1) * 7,
+            left: left,
             top: win.get("pos").get(0) * lineHeight,
             backgroundColor: bg,
             color: fg,
         }
 
-        return (
-            <div style={style}>
-                {lines.map((line, i) => {
-                    return (<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} />)
-                })}
-            </div>)
+        if (left > 0) {
+            style.borderLeft = "1px solid #000000"
+            style.paddingLeft = "6px"
+        }
+
+        var linesHtml = []
+        if (cursor) {
+            var pos = editor.get("cursorPos")
+            var winPos = win.get("pos")
+            var left = pos[1] - winPos.get(1) + 1
+            var top = pos[0] - winPos.get(0)
+            linesHtml.push(<Cursor key={"cursor"} left={left} top={top} editor={editor} />)
+        }
+        lines.map((line, i) => {
+            linesHtml.push(<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} />)
+        })
+
+        return <div style={style}>{linesHtml}</div>
     }
 }
 

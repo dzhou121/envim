@@ -8,6 +8,7 @@ import ReactDOM from 'react-dom';
 import ReadWriteLock from 'rwlock'
 import Window from './components/Window'
 import Cursor from './components/Cursor'
+import Cmd from './components/Cmd'
 
 var uniqueId = 0
 
@@ -24,6 +25,12 @@ var editor = Immutable.Map({
     highlight: {},
     scroll: [],
 })
+
+var cmdPos = [editor.get("height") - editor.get("cmdheight"), 0]
+var cmdEnd = [editor.get("height"), editor.get("width") - 1]
+editor = editor.merge(Immutable.fromJS({cmdPos: cmdPos, cmdEnd: cmdEnd}))
+
+console.log(editor.toJS())
 
 var EnvimState = {editor: editor}
 
@@ -43,17 +50,27 @@ var EnvimEditor = React.createClass({
         var wins = []
         var editor = this.state.editor
         var windows = editor.get('windows')
+        var pos = editor.get("cursorPos")
 
         if (windows !== undefined) {
-            wins = windows.map((win, i) =>
-                <Window key={i} win={win} bg={editor.get("bg")} fg={editor.get("fg")} />
-            )
+            wins = windows.map((win, i) => {
+                var winPos = win.get("pos")
+                var winEnd = win.get("end")
+                var cursor = false
+                if (pos[0] >= winPos.get(0) && pos[0] <= winEnd.get(0) && pos[1] >= winPos.get(1) && pos[1] <= winEnd.get(1)) {
+                    cursor = true
+                }
+                if (win.get("cmd")) {
+                    return <Cmd key={i} win={win} bg={editor.get("bg")} fg={editor.get("fg")} editor={editor} cursor={cursor} />
+                } else {
+                    return <Window key={i} win={win} bg={editor.get("bg")} fg={editor.get("fg")} editor={editor} cursor={cursor} />
+                }
+            })
         }
 
         return (
             <div>
                 {wins}
-                <Cursor editor={editor} />
             </div>
         )
     }
@@ -175,14 +192,26 @@ class Editor {
                             })
                         ).then(value => {
                             var windows = Immutable.fromJS(value.map((win, index) => {
-                                    return {
-                                        height: win.height,
-                                        width: win.width,
-                                        pos: win.pos,
-                                        end: [win.pos[0] + win.height, win.pos[1] + win.width],
-                                    }
-                                }))
-                            this.state.editor = this.state.editor.merge(Immutable.fromJS({windows: windows, tabs: tabs}))
+                                return {
+                                    height: win.height,
+                                    width: win.width,
+                                    pos: win.pos,
+                                    end: [win.pos[0] + win.height, win.pos[1] + win.width],
+                                }
+                            }))
+
+                            windows = windows.push(Immutable.Map({
+                                height: this.state.editor.get("cmdheight"),
+                                width: this.state.editor.get("width"),
+                                pos: this.state.editor.get("cmdPos"),
+                                end: this.state.editor.get("cmdEnd"),
+                                cmd: true,
+                            }))
+
+                            this.state.editor = this.state.editor.merge(Immutable.fromJS({
+                                windows: windows,
+                                tabs: tabs,
+                            }))
                             this.parseArgs(args)
                         })
 
@@ -322,7 +351,7 @@ class Editor {
         return spans
     }
 
-    put(args) {
+    put(args, move = true) {
         var windows = this.state.editor.get("windows")
         var cursorPos = this.state.editor.get("cursorPos")
         var currentWinIndex = this.winCursorPos(cursorPos)
@@ -351,37 +380,13 @@ class Editor {
         var width = currentWin.get("width")
         spans = this.spansPut(spans, c, args.map(arg => {return arg[0]}), width)
         line = line.set("spans", spans)
-        // var span = Immutable.Map({
-        //     col: c,
-        //     text: _.join(args.map(arg => {return arg[0]}), ''),
-        //     highlight: Object.assign({}, this.state.editor.get("highlight")),
-        // })
-        // console.log(span.toJS())
-        // line = line.set(c, span)
-        // for (var index = 0; index < args.length; index ++) {
-        //     // var char = line.get(c + index)
-        //     // if (char === undefined) {
-        //     //     char = Immutable.Map({char: arg[0], highlight: this.state.editor.get("highlight")})
-        //     //     line = line.set(c + index, char)
-        //     // } else if (char.get("char") != arg[0]) {
-        //     //     char = char.set("char", arg[0])
-        //     //     line = line.set(c + index, char)
-        //     // }
-        //     // if (char === undefined || char.get("char") != arg[0]) {
-        //     //     char = char.set("char", arg[0])
-        //     //     line = line.set(c + index, char)
-        //     // }
-        //     if ((c + index) >= currentWin.get("width")) {
-        //         break
-        //     }
-        //     var arg = args[index]
-        //     line = line.set(c + index, Immutable.Map({char: arg[0], highlight: this.state.editor.get("highlight")}))
-        // }
         lines = lines.set(currentWinCursorPos[0], line)
         currentWin = currentWin.set("lines", lines)
         windows = windows.set(currentWinIndex, currentWin)
         this.state.editor = this.state.editor.set("windows", windows)
-        this.state.editor = this.state.editor.set("cursorPos", [cursorPos[0], cursorPos[1] + args.length])
+        if (move) {
+            this.state.editor = this.state.editor.set("cursorPos", [cursorPos[0], cursorPos[1] + args.length])
+        }
     }
 
     highlightSet(args) {
@@ -419,7 +424,7 @@ class Editor {
             args.push([" "])
         }
         // this.state.editor = this.state.editor.set("highlight", {})
-        this.put(args)
+        this.put(args, false)
     }
 
     decToHex(n) {

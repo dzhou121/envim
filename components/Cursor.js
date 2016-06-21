@@ -7,7 +7,8 @@ class Cursor extends Component {
     }
 
     render() {
-        const { editor } = this.props
+        console.log("cursor render")
+        const { editor, left, top } = this.props
 
         var pos = editor.get('cursorPos')
         var fontSize = editor.get('fontSize')
@@ -17,15 +18,16 @@ class Cursor extends Component {
         var style = {
             width: fontSize / 2,
             height: fontSize * lineHeight,
-            position: "fixed",
-            left: pos[1] * fontSize / 2,
-            top: pos[0] * fontSize * lineHeight,
+            position: "absolute",
+            left: left * fontSize / 2,
             backgroundColor: fg,
         }
+        if (top != undefined) {
+            style.top = top * fontSize * lineHeight
+        }
+        console.log("cursor style", style)
 
-        return (
-            <div style={style}>
-            </div>)
+        return (<div style={style}></div>)
     }
 }
 
