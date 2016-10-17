@@ -2,6 +2,10 @@ import React, { Component } from 'react'
 import * as _ from 'lodash'
 import Line from './Line'
 import Cursor from './Cursor'
+import Number from './Number'
+import Sign from './Sign'
+import Popupmenu from './Popupmenu'
+import StatusLine from './Statusline'
 
 class Window extends Component {
     constructor(props, context) {
@@ -9,11 +13,11 @@ class Window extends Component {
     }
 
     shouldComponentUpdate(nextProps, nextState) {
-        return (nextProps.win != this.props.win) || (this.props.cursor)
+        return (nextProps.win != this.props.win) || (this.props.cursor != nextProps.cursor) || (this.props.popupmenu != nextProps.popupmenu) || (this.props.popupmenuShow != nextProps.popupmenuShow)
     }
 
     render() {
-        const { win, bg, fg, editor, cursor } = this.props
+        const { win, bg, fg, editor, cursor, popupmenuShow, popupmenu } = this.props
         var lines = win.get("lines")
         if (lines === undefined || lines.length == 0) {
             return <div></div>
@@ -22,10 +26,10 @@ class Window extends Component {
         var lineHeight = 14 * 1.5
         var padding = 0
 
-        var pos = win.get("pos")
+        var pos = [win.get("row"), win.get("col")]
         var left = 0
-        if (pos.get(1) > 0) {
-            var left = (pos.get(1) - 1 ) * 7
+        if (pos[1] > 0) {
+            var left = (pos[1] - 1 ) * 7
         }
 
         var style = {
@@ -33,7 +37,7 @@ class Window extends Component {
             height: win.get("height") * lineHeight,
             position: "fixed",
             left: left,
-            top: win.get("pos").get(0) * lineHeight,
+            top: pos[0] * lineHeight,
             backgroundColor: bg,
             boxShadow: "inset -3px 0 0 rgba(0, 0, 0, 0.05)",
             color: fg,
@@ -45,19 +49,34 @@ class Window extends Component {
             padding = 6
         }
 
+        var popupmenuHtml
+        if (popupmenuShow) {
+            popupmenuHtml = <Popupmenu key={"popupmenu"} menu={popupmenu} />
+        }
         var linesHtml = []
         if (cursor) {
-            var pos = editor.get("cursorPos")
-            var winPos = win.get("pos")
-            var left = pos[1] - winPos.get(1)
-            var top = pos[0] - winPos.get(0)
-            linesHtml.push(<Cursor key={"cursor"} padding={padding} left={left} top={top} editor={editor} />)
+            var pos = win.get("cursorPos")
+            linesHtml.push(<Cursor key={"cursor"} padding={padding} left={pos[1]} top={pos[0]} editor={editor} mode={editor.mode} />)
         }
         lines.map((line, i) => {
-            linesHtml.push(<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} />)
+            linesHtml.push(<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} i={i} lineObject={line} uniqueId={line.get("uniqueId")} />)
         })
+        var signHtml
+        if (win.get("drawSign")) {
+            signHtml = <Sign sign={win.get("signColumn")} height={win.get("height")} />
+        }
+        var statusLineHtml
+        if (win.get("statusLine")) {
+            statusLineHtml = <StatusLine spans={win.get("statusLine").spans} height={win.get("height")} />
+        }
 
-        return <div style={style}>{linesHtml}</div>
+        return <div style={style}>
+            {popupmenuHtml}
+            {signHtml}
+            {statusLineHtml}
+            <Number drawSign={win.get("drawSign")} numWidth={win.get("numWidth")} num={win.get("numColumn")} height={win.get("height")} />
+            <div>{linesHtml}</div>
+            </div>
     }
 }
 

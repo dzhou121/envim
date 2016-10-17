@@ -9,7 +9,10 @@ export default class Line extends Component {
     }
 
     shouldComponentUpdate(nextProps, nextState) {
-        return nextProps.line != this.props.line
+        if (nextProps.lineObject != this.props.lineObject) {
+         console.log("line update", this.props.i)
+        }
+        return nextProps.lineObject != this.props.lineObject
     }
 
     render() {
@@ -37,6 +40,26 @@ export default class Line extends Component {
                 spans.push(<Span key={i} span={span} last={last} />)
             }
         })
+
+        if (line.size == 1) {
+            var span = line.get(0)
+            if (span.get("text") === undefined) {
+                span = span.set("text", "")
+            }
+            if (span.get("text").length < width) {
+                spans = []
+                spans.push(<Span key={0} span={span} last={false} />)
+                span = span.set("text", " ")
+                span = span.set("highlight", {})
+                spans.push(<Span key={1} span={span} last={true} />)
+            }
+        }
+
+        // if (spans.length == 1) {
+        //     if (spans[0].get("text").length < width) {
+        //         spans.push(<Span />)
+        //     }
+        // }
 
         return (
             <pre>{spans}</pre>

@@ -10,64 +10,21 @@ export default class Cmd extends Component {
     }
 
     shouldComponentUpdate(nextProps, nextState) {
-        return (nextProps.win != this.props.win) || (this.props.cursor)
+        return true
     }
 
     render() {
-        const { win, bg, fg, editor, cursor } = this.props
-        var lines = win.get("lines")
-        if (lines === undefined || lines.length == 0) {
-            return <div></div>
-        }
-        var lineHeight = 14 * 1.5
-        var width = 60
-        var height = 2
-        var top = 0
-        var left = (editor.get("width") - width) / 2
-        var padding = 7
+        const { text, pos, editor } = this.props
         var style = {
-            width: width * 7,
-            // height: height * lineHeight,
-            padding: padding,
-            left: left * 7,
-            top: top * lineHeight,
+            zIndex: 100,
             position: "fixed",
-            backgroundColor: bg,
-            color: fg,
-            // padding: 10,
-            border: "1px solid rgba(255, 255, 255, 0.07)",
-            boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
+            backgroundColor: "#0e1112",
+            color: "#cdd3de",
+            padding: 16,
         }
-        var display = false
-
-        var cmd = []
-        if (cursor) {
-            var pos = editor.get("cursorPos")
-            var winPos = win.get("pos")
-            var left = pos[1] - winPos.get(1)
-            cmd.push(<Cursor key={"cursor"} padding={padding} left={left} editor={editor} />)
-        }
-        lines.map((line, i) => {
-            if (line != undefined) {
-                line.get("spans").forEach(span => {
-                    if (span != undefined) {
-                        span.get("text").split("").some(char => {
-                            if (char != " ") {
-                                display = true
-                                return true
-                            }
-                        })
-                    }
-                })
-                cmd.push(<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} />)
-            }
-        })
-
-        if (!display) {
-            style.display = "none"
-        } else {
-        }
-
-        return <div style={style}><div>{cmd}</div></div>
+        return <div style={style}>
+            <Cursor padding={16} left={pos} editor={editor} mode={"insert"} />
+            <pre><span>{text}</span></pre>
+            </div>
     }
 }

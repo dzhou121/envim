@@ -7,12 +7,11 @@ class Cursor extends Component {
     }
 
     render() {
-        const { editor, left, top, padding } = this.props
+        const { editor, left, top, padding, mode } = this.props
 
-        var pos = editor.get('cursorPos')
-        var fontSize = editor.get('fontSize')
-        var lineHeight = editor.get('lineHeight')
-        var fg = editor.get('fg')
+        var fontSize = editor.fontSize
+        var lineHeight = editor.lineHeight
+        var fg = editor.fg
 
         var style = {
             width: fontSize / 2 - 0.5,
@@ -25,13 +24,12 @@ class Cursor extends Component {
         }
 
 
-        if (editor.get("mode") == "normal") {
+        if (mode == "normal") {
             style.backgroundColor = "#ffffff"
             style.opacity = 0.5
         }
 
-        if (editor.get("mode") == "insert") {
-            console.log(editor.get("mode"))
+        if (mode == "insert") {
             style.borderLeft = "1px solid #fdf6e3"
         }
 

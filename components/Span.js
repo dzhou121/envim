@@ -1,5 +1,4 @@
 import React, { Component } from 'react'
-import PureRenderMixin from 'react-addons-pure-render-mixin';
 import * as _ from 'lodash'
 
 export default class Span extends Component {

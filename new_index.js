@@ -1,4 +1,4 @@
-import { attach } from 'promised-neovim-client'
+import * as neovimClient from 'neovim-client'
 import {spawn } from 'child_process'
 import Immutable from 'immutable'
 import * as Promise from 'bluebird'
@@ -9,29 +9,42 @@ import ReadWriteLock from 'rwlock'
 import Window from './components/Window'
 import Cursor from './components/Cursor'
 import Cmd from './components/Cmd'
+import Popupmenu from './components/Popupmenu'
 
 var uniqueId = 0
 
 var lock = new ReadWriteLock()
 
-var editor = Immutable.Map({
+var editor = {
+    cmdline: "",
+    cmdlineShow: false,
     width: 120,
-    height: 30,
+    height: 20,
     mode: "normal",
     lineHeight: 1.5,
     fontSize: 14,
     statusLine: true,
     cmdheight: 1,
     cursorPos: [0, 0],
+    cursorWin: 1,
     highlight: {},
     scroll: [],
-})
+    wins: Immutable.Map({}),
+    popupmenu: Immutable.Map({
+        selected: -1,
+        show: false,
+        pos: [],
+        items: [],
+    }),
+    popupmenuWin: 1,
+}
 
-var cmdPos = [editor.get("height") - editor.get("cmdheight"), 0]
-var cmdEnd = [editor.get("height"), editor.get("width") - 1]
-editor = editor.merge(Immutable.fromJS({cmdPos: cmdPos, cmdEnd: cmdEnd}))
+var cmdPos = [editor.height - editor.cmdheight, 0]
+var cmdEnd = [editor.height, editor.width - 1]
+editor.cmdPos = cmdPos
+editor.cmdEnd = cmdEnd
 
-console.log(editor.toJS())
+// console.log(editor)
 
 var EnvimState = {editor: editor}
 
@@ -48,30 +61,44 @@ var EnvimEditor = React.createClass({
     },
 
     render: function() {
-        var wins = []
+        var winsElement = []
         var editor = this.state.editor
-        var windows = editor.get('windows')
-        var pos = editor.get("cursorPos")
+        var wins = editor.wins
+        var pos = editor.cursorPos
 
-        if (windows !== undefined) {
-            wins = windows.map((win, i) => {
-                var winPos = win.get("pos")
-                var winEnd = win.get("end")
+        var cmdHtml
+        if (editor.cmdlineShow) {
+            cmdHtml = <Cmd text={editor.cmdline} pos={editor.cmdlinePos} editor={editor} />
+        }
+
+        if (wins !== undefined) {
+            wins.map(win => {
+                var i = win.get('id')
+                // var winPos = win.get("pos")
+                // var winEnd = win.get("end")
                 var cursor = false
-                if (pos[0] >= winPos.get(0) && pos[0] <= winEnd.get(0) && pos[1] >= winPos.get(1) && pos[1] <= winEnd.get(1)) {
+                var popupmenuShow = false
+                if (1 == editor.cursorWin) {
                     cursor = true
                 }
-                if (win.get("cmd")) {
-                    return <Cmd key={i} win={win} bg={editor.get("bg")} fg={editor.get("fg")} editor={editor} cursor={cursor} />
-                } else {
-                    return <Window key={i} win={win} bg={editor.get("bg")} fg={editor.get("fg")} editor={editor} cursor={cursor} />
+                if (i == editor.popupmenuWin) {
+                    popupmenuShow = true
                 }
+                // if (pos[0] >= winPos.get(0) && pos[0] <= winEnd.get(0) && pos[1] >= winPos.get(1) && pos[1] <= winEnd.get(1)) {
+                //     cursor = true
+                // }
+                // if (win.get("cmd")) {
+                //     winsElement.push(<Cmd key={i} win={win} bg={editor.bg} fg={editor.fg} editor={editor} cursor={cursor} />)
+                // } else {
+                    winsElement.push(<Window key={i} win={win} bg={editor.bg} fg={editor.fg} editor={editor} cursor={cursor} popupmenuShow={popupmenuShow} popupmenu={editor.popupmenu} />)
+                // }
             })
         }
 
         return (
             <div>
-                {wins}
+                {cmdHtml}
+                {winsElement}
             </div>
         )
     }
@@ -83,15 +110,17 @@ ReactDOM.render(
 )
 
 function initEditor() {
-        var nvim_proc = spawn('nvim', ['./index.js', '--embed'], {})
-        attach(nvim_proc.stdin, nvim_proc.stdout).then(function (nvim) {
+    // console.log("now init editor")
+        var nvim_proc = spawn('/Users/Lulu/neovim/build/bin/nvim', ['./index.js', '--embed'], {})
+    // console.log(neovimClient);
+        neovimClient.default(nvim_proc.stdin, nvim_proc.stdout, function (err, nvim) {
+            // console.log(err, nvim)
             EnvimState.nvim = nvim
             uiAttach()
 
             document.addEventListener('keydown', function(e) {
                 var key = e.key
                 // console.log("keydown", getVimSpecialCharFromKey(e))
-                // console.log(e)
                 if (key.length > 1) {
                     key = getVimSpecialCharFromKey(e)
                     if (key === null) {
@@ -112,9 +141,12 @@ function initEditor() {
 }
 
 function uiAttach() {
+    // console.log("now attach ui")
     var nvim = EnvimState.nvim
     var editor = EnvimState.editor
-    nvim.uiAttach(editor.get('width'), editor.get('height'), true, function() {
+    nvim._session.request('nvim_ui_attach', [editor.width, editor.height, {'rgb': true, 'window_external': true, 'popupmenu_external': true}], function(err, res) {
+        // console.log(err)
+        // console.log(res)
     })
     onNotify()
 }
@@ -147,35 +179,95 @@ class Editor {
             var e = arg[0]
             switch (e) {
                 case 'cursor_goto':
+                    break
                     this.cursorGoto(arg.slice(1))
                     break
                 case 'put':
+                    // console.log("put")
+                    break
                     this.put(arg.slice(1))
                     break
                 case 'update_fg':
-                    this.state.editor = this.state.editor.set("fg", this.decToHex(arg[1][0]))
+                    this.state.editor.fg = this.decToHex(arg[1][0])
                     break
                 case 'update_bg':
-                    this.state.editor = this.state.editor.set("bg", this.decToHex(arg[1][0]))
+                    this.state.editor.bg = this.decToHex(arg[1][0])
                     break
                 case 'highlight_set':
                     this.highlightSet(arg.slice(1))
                     break
                 case 'eol_clear':
+                    break
                     this.eolClear(arg.slice(1))
                     break
                 case 'set_scroll_region':
+                    break
                     this.setScrollRegion(arg.slice(1))
                     break
                 case 'scroll':
+                    console.log('scroll')
+                    console.log(arg.slice(1)[0])
+                    break
                     this.scroll(arg.slice(1))
                     break
                 case 'mode_change':
                     this.modeChange(arg.slice(1))
                     break
+                case 'win_scroll':
+                    this.win_scroll(arg.slice(1))
+                    break
+                case 'win_update':
+                    // console.log("win_update")
+                    this.win_update(arg.slice(1))
+                    break
+                case 'win_draw_sign':
+                    // console.log("win_draw_sign")
+                    this.win_draw_sign(arg.slice(1))
+                    break
+                case 'win_put':
+                    // console.log("win_put")
+                    this.win_put(arg.slice(1))
+                    break
+                case 'win_cursor_goto':
+                    // console.log("win_cursor_goto")
+                    this.win_cursor_goto(arg.slice(1))
+                    break
+                case 'popupmenu_show':
+                    this.popupmenu_show(arg.slice(1))
+                    break
+                case 'popupmenu_hide':
+                    this.popupmenu_hide(arg.slice(1))
+                    break
+                case 'popupmenu_select':
+                    this.popupmenu_select(arg.slice(1))
+                    break
+                case 'cmdline':
+                    this.cmdline(arg.slice(1))
+                    break
+                case 'cmdlinepos':
+                    this.cmdlinepos(arg.slice(1))
+                    break
+                case 'command_line_enter':
+                    this.command_line_enter(arg.slice(1))
+                    break
+                case 'command_line_leave':
+                    this.command_line_leave(arg.slice(1))
+                    break
+                case 'bell':
+                    this.bell(arg.slice(1))
+                    break
+                case 'busy_start':
+                    this.busy_start(arg.slice(1))
+                    break
+                case 'busy_stop':
+                    this.busy_stop(arg.slice(1))
+                    break
+                case 'mouse_on':
+                    this.mouse_on(arg.slice(1))
+                    break
                 default:
                     console.log(e)
-                    console.log(arg)
+                    console.log(arg[1])
                     break
             }
         })
@@ -183,145 +275,20 @@ class Editor {
         this.release()
     }
 
-    concatWin(args) {
-        this.nvim.getTabpages().then(tabs => {
-            this.nvim.getCurrentTabpage().then(tab => {
-                tab.getWindows().then(windows => {
-                    Promise.all(
-                        windows.map((win, index) => {
-                            return Promise.props({
-                                height: win.getHeight(),
-                                width: win.getWidth(),
-                                pos: win.getPosition(),
-                            })
-                        })
-                    ).then(value => {
-                        var windows = Immutable.fromJS(value.map((win, index) => {
-                            return {
-                                height: win.height,
-                                width: win.width,
-                                pos: win.pos,
-                                end: [win.pos[0] + win.height, win.pos[1] + win.width],
-                            }
-                        }))
-
-                        windows = windows.push(Immutable.Map({
-                            height: this.state.editor.get("cmdheight"),
-                            width: this.state.editor.get("width"),
-                            pos: this.state.editor.get("cmdPos"),
-                            end: this.state.editor.get("cmdEnd"),
-                            cmd: true,
-                        }))
-
-                        var oldWindows = this.state.editor.get("windows")
-
-                        var changed = false
-
-                        if (oldWindows.size != windows.size) {
-                            changed = true
-                        } else {
-                            for (var i = 0; i < windows.size; i++) {
-                                var win = windows.get(i)
-                                var oldWin = oldWindows.get(i)
-                                var pos = win.get("pos")
-                                var width = win.get("width")
-                                var height = win.get("height")
-                                var oldPos = oldWin.get("pos")
-                                var oldWidth = oldWin.get("width")
-                                var oldHeight = oldWin.get("height")
-                                if (pos.get(0) != oldPos.get(0) || pos.get(1) != oldPos.get(1) || width != oldWidth || height != oldHeight) {
-                                    changed = true
-                                    break
-                                }
-                            }
-                        }
-
-                        if (changed) {
-                            windows = windows.map(win => {
-                                for (var i = 0; i < oldWindows.size; i++) {
-                                    var oldWin = oldWindows.get(i)
-                                    var pos = win.get("pos")
-                                    var width = win.get("width")
-                                    var oldPos = oldWin.get("pos")
-                                    if (pos.get(0) == oldPos.get(0) && pos.get(1) == oldPos.get(1)) {
-                                        win = win.merge({lines: oldWin.get("lines")})
-                                        break
-                                    }
-                                }
-                                return win
-                            })
-                            this.state.editor = this.state.editor.set("windows", windows)
-                            console.log(this.state.editor.toJS())
-                            console.log("windows changed")
-                        } else {
-                            console.log("windows not changed")
-                        }
-                        // windows = windows.map(win => {
-                        //     var pos = win.get(pos)
-
-                        // })
-
-                        // this.state.editor = this.state.editor.merge(Immutable.fromJS({
-                        //     windows: windows,
-                        //     tabs: tabs,
-                        // }))
-                        this.parseArgs(args)
-                    })
-
-                })
-            })
-        })
+    redraw(args) {
+        this.parseArgs(args)
     }
 
-    redraw(args) {
-        if (this.state.editor.get('windows') != undefined) {
-            // this.parseArgs(args)
-            if (args.length > 100) {
-                this.concatWin(args)
-            } else {
-                this.parseArgs(args)
-            }
-        } else {
-            this.nvim.getTabpages().then(tabs => {
-                this.nvim.getCurrentTabpage().then(tab => {
-                    tab.getWindows().then(windows => {
-                        Promise.all(
-                            windows.map((win, index) => {
-                                return Promise.props({
-                                    height: win.getHeight(),
-                                    width: win.getWidth(),
-                                    pos: win.getPosition(),
-                                })
-                            })
-                        ).then(value => {
-                            var windows = Immutable.fromJS(value.map((win, index) => {
-                                return {
-                                    height: win.height,
-                                    width: win.width,
-                                    pos: win.pos,
-                                    end: [win.pos[0] + win.height, win.pos[1] + win.width],
-                                }
-                            }))
+    bell(args) {
+    }
 
-                            windows = windows.push(Immutable.Map({
-                                height: this.state.editor.get("cmdheight"),
-                                width: this.state.editor.get("width"),
-                                pos: this.state.editor.get("cmdPos"),
-                                end: this.state.editor.get("cmdEnd"),
-                                cmd: true,
-                            }))
+    busy_start(args) {
+    }
 
-                            this.state.editor = this.state.editor.merge(Immutable.fromJS({
-                                windows: windows,
-                                tabs: tabs,
-                            }))
-                            this.parseArgs(args)
-                        })
+    busy_stop(args) {
+    }
 
-                    })
-                })
-            })
-        }
+    mouse_on(args) {
     }
 
     cursorGoto(args) {
@@ -340,14 +307,71 @@ class Editor {
         return currentIndex
     }
 
-    spansPut(spans, col, text, width) {
+    spansPutNew(spans, col, text, width) {
+        var chars = ""
+        text.forEach((char, i) => {
+            chars = chars + char
+        })
+        spans = spans.set(col, Immutable.Map({highlight: {}, text: chars}))
+        return spans
+    }
+
+    spansPut(spans, row, col, text, width, height, numWidth, drawSign, signColumn, numColumn) {
         var chars = Immutable.List()
         var line = Immutable.List()
-        var highlight = this.state.editor.get("highlight")
+        var highlight = this.state.editor.highlight
         var end = col + text.length
         var affectedChars = []
         var affectedStart = -1
         var affectedEnd = -1
+
+        if (signColumn === undefined) {
+            signColumn = Immutable.List()
+        }
+        if (numColumn === undefined) {
+            numColumn = Immutable.List()
+        }
+
+        if (height > row) {
+            if (drawSign) {
+                var signOffset = 1;
+                if (col <= signOffset) {
+                    for (col; col <= signOffset; col++) {
+                        var c = text.shift()
+                        if (c === undefined) {
+                            break
+                        }
+                        var sign = signColumn.get(row)
+                        var signText = []
+                        if (sign != undefined) {
+                            signText = sign.sign
+                        }
+                        signText[col] = c
+                        signColumn = signColumn.set(row, {'sign': signText, 'highlight': highlight})
+                    }
+                }
+            }
+            var numOffset = numWidth + (drawSign ? 2:0) - 1
+            if (col <= numOffset) {
+                for (col; col <= numOffset; col++) {
+                    var c = text.shift()
+                    if (c === undefined) {
+                        break
+                    }
+                    var num = numColumn.get(row)
+                    var numText = []
+                    if (num != undefined) {
+                        numText = num.num
+                    }
+                    numText[col - (drawSign ? 2:0)] = c
+                    numColumn = numColumn.set(row, {'num': numText, 'highlight': highlight})
+                }
+            }
+            if (text.length == 0) {
+                return [signColumn, numColumn, spans]
+            }
+        }
+
         if (spans.size > width) {
             var newSpans = Immutable.List()
             for (var i = 0; i <= width; i++) {
@@ -437,12 +461,38 @@ class Editor {
                 } else {
                     spans = spans.set(i, Immutable.Map({highlight: char.highlight, text: char.char}))
                 }
-                // lastIndex = i
+                if (i > 0) {
+                    var text = ""
+                    for (var j = 0; j < i; j++) {
+                        text = text + " "
+                    }
+                    spans = spans.set(0, Immutable.Map({highlight: {}, text: text}))
+                }
+                lastIndex = i
             } else {
                 var span = spans.get(lastIndex)
-                if (span == null) {
-                    console.log(spans.toJS())
+                var spanHighlight = span.get("highlight")
+                if (span.get("text").length < (i - lastIndex)) {
+                    var newText = ""
+                    for(var j = 0; j < (i - lastIndex - span.get("text").length); j++) {
+                        newText = newText + " "
+                    }
+
+                    if (spanHighlight.background != undefined || spanHighlight.foreground != undefined) {
+                        // console.log('"' + newText + '"')
+                        var currentIndex = span.get("text").length + lastIndex
+                        var newSpan = Immutable.Map({highlight: {}, text: newText})
+                        spans = spans.set(currentIndex, newSpan)
+                        lastIndex = currentIndex
+                    } else {
+                        // console.log('"' + span.get("text") + '"')
+                        // console.log('"' + newText + '"')
+                        span = span.set("text", span.get("text") + newText)
+                        spans = spans.set(lastIndex, span)
+                    }
                 }
+
+                var span = spans.get(lastIndex)
                 var spanHighlight = span.get("highlight")
                 var currentHighlight = {}
                 var charContent = " "
@@ -450,6 +500,7 @@ class Editor {
                     currentHighlight = char.highlight
                     charContent = char.char
                 }
+
                 if (currentHighlight.foreground != spanHighlight.foreground || currentHighlight.background != spanHighlight.background) {
                     var newSpan = Immutable.Map({highlight: currentHighlight, text: charContent})
                     spans = spans.set(i, newSpan)
@@ -463,7 +514,269 @@ class Editor {
         }
         // console.log(spans.toJS())
         // console.log("-------------------")
-        return spans
+        return [signColumn, numColumn, spans]
+    }
+
+    cmdlinepos(args) {
+        var arg = args[0]
+        this.state.editor.cmdlinePos = arg[0]
+    }
+
+    cmdline(args) {
+        var arg = args[0]
+        this.state.editor.cmdline = arg[0]
+        this.state.editor.cmdlinePos = arg[1]
+    }
+
+    command_line_enter(args) {
+        this.state.editor.cmdlineShow = true
+    }
+
+    command_line_leave(args) {
+        this.state.editor.cmdline = ""
+        this.state.editor.cmdlinePos = 0
+        this.state.editor.cmdlineShow = false
+    }
+
+    popupmenu_select(args) {
+        var arg = args[0]
+        this.state.editor.popupmenu = this.state.editor.popupmenu.set("selected", arg[0])
+    }
+
+    popupmenu_hide(args) {
+        this.state.editor.popupmenu = this.state.editor.popupmenu.set("show", false)
+    }
+
+    popupmenu_show(args) {
+        var arg = args[0]
+        var popupmenu = this.state.editor.popupmenu
+        popupmenu = popupmenu.set("show", true)
+        popupmenu = popupmenu.set("items", arg[0])
+        popupmenu = popupmenu.set("selected", arg[1])
+        popupmenu = popupmenu.set("pos", [arg[2], arg[3]])
+        this.state.editor.popupmenuWin = arg[4]
+        this.state.editor.popupmenu = popupmenu
+    }
+
+    win_cursor_goto(args) {
+        var arg = args[0]
+        // console.log("win cursor goto")
+        // console.log(arg[1], arg[2])
+        var winId = arg[0]
+        var cursorRow = arg[1]
+        var cursorCol = arg[2]
+        var wins = this.state.editor.wins
+        var win = wins.get(winId)
+        if (win === undefined) {
+            win = Immutable.Map({
+            })
+        }
+        win = win.set("cursorPos", [cursorRow, cursorCol])
+        this.state.editor.wins = wins.set(winId, win)
+    }
+
+    win_put(args) {
+        var arg = args[0]
+        console.log("win_put")
+        console.log(args.map(arg => {return arg[1]}))
+        var winId = arg[0]
+        var char = arg[1]
+        var wins = this.state.editor.wins
+        var win = wins.get(winId)
+        var cursorPos = win.get("cursorPos")
+        if (win === undefined) {
+            win = Immutable.Map({
+            })
+        }
+        if (cursorPos === undefined) {
+            cursorPos = [0, 0]
+        }
+        var col = cursorPos[1]
+        var width = win.get("width")
+        var height = win.get("height")
+        var numWidth = win.get("numWidth")
+        var drawSign = win.get("drawSign")
+        var signColumn = win.get("signColumn")
+        var numColumn = win.get("numColumn")
+        if (cursorPos[0] < height) {
+            var lines = win.get("lines")
+            if (lines === undefined) {
+                lines = Immutable.List()
+            }
+            var line = lines.get(cursorPos[0])
+            if (line === undefined) {
+                uniqueId = uniqueId + 1
+                line = Immutable.Map({
+                    uniqueId: uniqueId,
+                    spans: Immutable.List(),
+                })
+            }
+            var spans = line.get("spans")
+            var result = this.spansPut(spans, cursorPos[0], col, args.map(arg => {return arg[1]}), width, height, numWidth, drawSign, signColumn, numColumn)
+            signColumn = result[0]
+            numColumn = result[1]
+            if (spans != result[2]) {
+                line = line.set("spans", result[2])
+            }
+            lines = lines.set(cursorPos[0], line)
+            win = win.set("lines", lines)
+        } else {
+            var statusLine = win.get("statusLine")
+            if (statusLine === undefined) {
+                statusLine = {spans: Immutable.List()}
+            }
+            var spans = statusLine.spans
+            var result = this.spansPut(spans, cursorPos[0], col, args.map(arg => {return arg[1]}), width, height, numWidth, drawSign, signColumn, numColumn)
+            statusLine.spans = result[2]
+            win = win.set("statusLine", statusLine)
+        }
+        win = win.set("signColumn", signColumn)
+        win = win.set("numColumn", numColumn)
+        win = win.set("cursorPos", [cursorPos[0], cursorPos[1] + args.length])
+        wins = wins.set(winId, win)
+        this.state.editor.wins = wins
+    }
+
+    win_draw_sign(args) {
+        var arg = args[0]
+        var winId = arg[0]
+        var drawSign = arg[1]
+        var wins = this.state.editor.wins
+        var win = wins.get(winId)
+        var need_update = false;
+        if (win == undefined) {
+            win = Immutable.Map({
+                drawSign: drawSign,
+            })
+            need_update = true;
+        } else {
+            if (win.get("drawSign") != drawSign) {
+                win = win.set("drawSign", drawSign)
+            }
+            need_update = true;
+        }
+        if (need_update) {
+            wins = wins.set(winId, win)
+            this.state.editor.wins = wins
+        }
+    }
+
+    win_scroll(args) {
+        var arg = args[0]
+        var winId = arg[0]
+        var count = arg[1]
+        var wins = this.state.editor.wins
+        var win = wins.get(winId)
+        var height = win.get("height")
+        if (height == undefined) {
+            height = 0
+        }
+        if (win == undefined) {
+            win = Immutable.Map({
+            })
+        }
+        var lines = Immutable.List()
+        var signColumn = Immutable.List()
+        var numColumn = Immutable.List()
+        var oldLines = win.get("lines")
+        var oldSignColumn = win.get("signColumn")
+        if (oldSignColumn == undefined) {
+            oldSignColumn = Immutable.List()
+        }
+        var oldNumColumn = win.get("numColumn")
+        if (oldNumColumn == undefined) {
+            oldNumColumn = Immutable.List()
+        }
+        if (count > 0) {
+            for (var i = count; i < height; i++) {
+                lines = lines.push(oldLines.get(i))
+                // if (oldSignColumn.get(i) != undefined) {
+                //     signColumn = signColumn.push(oldSignColumn.get(i))
+                // }
+                // if (oldNumColumn.get(i) != undefined) {
+                //     numColumn = numColumn.push(oldNumColumn.get(i))
+                // }
+            }
+            for (var i = 0; i < count; i++) {
+                uniqueId = uniqueId + 1
+                lines = lines.push(Immutable.Map({
+                    uniqueId: uniqueId,
+                    spans: Immutable.List(),
+                }))
+                // signColumn = signColumn.push({})
+                // numColumn = numColumn.push({})
+            }
+        } else {
+            for (var i = 0; i > count; i--) {
+                uniqueId = uniqueId + 1
+                lines = lines.push(Immutable.Map({
+                    uniqueId: uniqueId,
+                    spans: Immutable.List(),
+                }))
+                // signColumn = signColumn.push({})
+                // numColumn = numColumn.push({})
+            }
+            for (var i = 0; i < height + count; i++) {
+                lines = lines.push(oldLines.get(i))
+                // if (oldSignColumn.get(i) != undefined) {
+                //     signColumn = signColumn.push(oldSignColumn.get(i))
+                // }
+                // if (oldNumColumn.get(i) != undefined) {
+                //     numColumn = numColumn.push(oldNumColumn.get(i))
+                // }
+            }
+        }
+
+        win = win.set("lines", lines)
+        // win = win.set("signColumn", signColumn)
+        // win = win.set("numColumn", numColumn)
+        wins = wins.set(winId, win)
+        this.state.editor.wins = wins
+    }
+
+    win_update(args) {
+        console.log("win_update")
+        var arg = args[0];
+        var need_update = false;
+        var wins = this.state.editor.wins
+        var winId = arg[0]
+        var width = arg[1]
+        var height = arg[2]
+        var row = arg[3]
+        var col = arg[4]
+        var numWidth = arg[5]
+        var drawSign = arg[6]
+        console.log("drawSign", drawSign)
+        var win = wins.get(winId)
+        if (win == undefined) {
+            win = Immutable.Map({
+                id: winId,
+                width: width,
+                height: height,
+                row: row,
+                col: col, 
+                numWidth: arg[5],
+                drawSign: arg[6],
+            })
+            need_update = true;
+        } else {
+            if (win.get("width") != width || win.get("height") != height || win.get("row") != row || win.get("col") != col || win.get("numWidth") != numWidth || win.get("drawSign") != drawSign) {
+                win = win.merge(Immutable.Map({
+                    id: winId,
+                    width: width,
+                    height: height,
+                    row: row,
+                    col: col, 
+                    numWidth: arg[5],
+                    drawSign: arg[6],
+                }))
+                need_update = true;
+            }
+        }
+        if (need_update) {
+            wins = wins.set(winId, win)
+            this.state.editor.wins = wins
+        }
     }
 
     put(args, move = true) {
@@ -493,7 +806,7 @@ class Editor {
         var spans = line.get("spans")
         var c = currentWinCursorPos[1]
         var width = currentWin.get("width")
-        spans = this.spansPut(spans, c, args.map(arg => {return arg[0]}), width)
+        // spans = this.spanssssPut(spans, c, args.map(arg => {return arg[0]}), width)
         line = line.set("spans", spans)
         lines = lines.set(currentWinCursorPos[0], line)
         currentWin = currentWin.set("lines", lines)
@@ -505,7 +818,7 @@ class Editor {
     }
 
     highlightSet(args) {
-        var newHighlight = this.state.editor.get("highlight")
+        var newHighlight = this.state.editor.highlight
         args.forEach((arg) => {
             var highlight = arg[0]
             if (Object.keys(highlight).length == 0) {
@@ -528,7 +841,7 @@ class Editor {
             newHighlight.background = this.decToHex(newHighlight.background)
         }
 
-        this.state.editor = this.state.editor.set("highlight", newHighlight)
+        this.state.editor.highlight = newHighlight
     }
 
     eolClear(args) {
@@ -552,6 +865,8 @@ class Editor {
     }
 
     setScrollRegion(args) {
+        console.log("set scroll region")
+        console.log(args[0])
         this.state.editor = this.state.editor.set("scroll", args[0])
     }
 
@@ -596,7 +911,7 @@ class Editor {
 
     modeChange(args) {
         var mode = args[0][0]
-        this.state.editor = this.state.editor.set("mode", mode)
+        this.state.editor.mode = mode
     }
 }
 
