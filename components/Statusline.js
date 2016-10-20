@@ -12,7 +12,7 @@ export default class StatusLine extends Component {
     }
 
     render() {
-        const { spans, height } = this.props
+        const { spans, height, width } = this.props
         if (spans === undefined) {
             return <pre></pre>
         }
@@ -38,6 +38,7 @@ export default class StatusLine extends Component {
         })
 
         var style = {
+            width: width * 7,
             position: "absolute",
             top: height * 14 * 1.5,
         }

@@ -18,6 +18,7 @@ class Cursor extends Component {
             height: fontSize * lineHeight,
             position: "absolute",
             left: left * fontSize / 2 + padding,
+            zIndex: 300,
         }
         if (top != undefined) {
             style.top = top * fontSize * lineHeight

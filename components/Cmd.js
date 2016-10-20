@@ -13,18 +13,60 @@ export default class Cmd extends Component {
         return true
     }
 
+    // componentDidMount(props) {
+    // }
+
+    // componentDidUpdate() {
+    //     var { pos, text }  = this.props
+    //     var cmd = document.getElementById("cmd")
+    //     cmd.focus()
+    //     cmd.value = text
+    //     cmd.setSelectionRange(pos, pos)
+    //     console.log("updated text", text)
+    // }
+
     render() {
-        const { text, pos, editor } = this.props
+        const { editor } = this.props
+        var { text, pos } = this.props
+        if (text == "") {
+            text = " "
+        }
+        var chars = 70
+        var width = 7 * chars
+        var padding = 21
         var style = {
             zIndex: 100,
-            position: "fixed",
+            position: "absolute",
             backgroundColor: "#0e1112",
             color: "#cdd3de",
-            padding: 16,
+            padding: padding,
+            width: width,
+            left: (editor.width * 7 - width) / 2,
         }
+        // if (text.length > chars) {
+        //     var offset = 0
+        //     if (pos > chars) {
+        //        offset = pos - chars 
+        //     }
+        //     pos = pos - offset
+        //     text = text.slice(offset, text.length)
+        //     if (text.length > chars) {
+        //         text = text.slice(0, chars)
+        //     }
+        // }
+        var spanStyle = {
+            float: "none",
+        }
+        var spansHtml = []
+        var trunks = text.match(new RegExp('.{1,' + chars + '}', 'g'));
+        trunks.forEach((trunk, i) => {
+            spansHtml.push(<span key={i} style={spanStyle}>{trunk}</span>)
+        })
+        var top = parseInt(pos / chars) + 1
+        var left = pos % chars
         return <div style={style}>
-            <Cursor padding={16} left={pos} editor={editor} mode={"insert"} />
-            <pre><span>{text}</span></pre>
+            <Cursor padding={padding} top={top} left={left} editor={editor} mode={"insert"} />
+            <pre>{spansHtml}</pre>
             </div>
     }
 }

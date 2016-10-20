@@ -12,7 +12,7 @@ class Number extends Component {
     }
 
     render() {
-        const { drawSign, height, numWidth, num } = this.props
+        const { drawSign, height, numWidth, num, bg } = this.props
         var left = 0
         if (drawSign) {
             left = 2 * 7
@@ -21,6 +21,7 @@ class Number extends Component {
             position: "absolute",
             left: left,
             paddingLeft: "inherit",
+            backgroundColor: bg,
         }
         var spanStyle = {
             float: "none",

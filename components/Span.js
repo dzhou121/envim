@@ -11,7 +11,8 @@ export default class Span extends Component {
     }
 
     render() {
-        const { span, last } = this.props
+        const { span, last, pos } = this.props
+        // console.log("render span", span.toJS())
         if (span === undefined) {
             return <span>{""}</span>
         }
@@ -32,6 +33,21 @@ export default class Span extends Component {
         if (last) {
             style.float = "none"
         }
-        return (<span style={style}>{span.get("text")}</span>)
+        // if (pos != undefined) {
+        //     style.position = "absolute"
+        //     style.left = pos * 7
+        //     style.float = "none"
+        // }
+        var text = span.get("text")
+        // var charsHtml = []
+        // text.split('').forEach((char, i) => {
+        //     var charStyle = {
+        //         position: "absolute",
+        //         left: i * 7,
+        //     }
+        //     charsHtml.push(<span style={charStyle} key={i}>{char}</span>)
+        // })
+        return (<span style={style}>{text}</span>)
+        // return (<span style={style}>{charsHtml}</span>)
     }
 }

@@ -9,9 +9,9 @@ export default class Line extends Component {
     }
 
     shouldComponentUpdate(nextProps, nextState) {
-        if (nextProps.lineObject != this.props.lineObject) {
-         console.log("line update", this.props.i)
-        }
+        // if (nextProps.lineObject != this.props.lineObject) {
+        //  console.log("line update", this.props.i)
+        // }
         return nextProps.lineObject != this.props.lineObject
     }
 
@@ -59,6 +59,11 @@ export default class Line extends Component {
         //     if (spans[0].get("text").length < width) {
         //         spans.push(<Span />)
         //     }
+        // }
+        // var style = {
+        //     position: "relative",
+        //     width: 300,
+        //     height: 14 * 1.5,
         // }
 
         return (

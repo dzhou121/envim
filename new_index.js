@@ -10,16 +10,22 @@ import Window from './components/Window'
 import Cursor from './components/Cursor'
 import Cmd from './components/Cmd'
 import Popupmenu from './components/Popupmenu'
+import Emsg from './components/Emsg'
+import Tab from './components/Tab'
 
 var uniqueId = 0
 
 var lock = new ReadWriteLock()
 
+var hideEmsg
+
 var editor = {
+    emsg: "",
+    msg: "",
     cmdline: "",
     cmdlineShow: false,
-    width: 120,
-    height: 20,
+    width: 200,
+    height: 50,
     mode: "normal",
     lineHeight: 1.5,
     fontSize: 14,
@@ -30,6 +36,8 @@ var editor = {
     highlight: {},
     scroll: [],
     wins: Immutable.Map({}),
+    activeWins: [],
+    tab: [],
     popupmenu: Immutable.Map({
         selected: -1,
         show: false,
@@ -65,15 +73,28 @@ var EnvimEditor = React.createClass({
         var editor = this.state.editor
         var wins = editor.wins
         var pos = editor.cursorPos
+        var tab = editor.tab
 
         var cmdHtml
         if (editor.cmdlineShow) {
             cmdHtml = <Cmd text={editor.cmdline} pos={editor.cmdlinePos} editor={editor} />
         }
+        var emsgHtml
+        if (editor.emsg != "") {
+            emsgHtml = <Emsg emsg={editor.emsg} />
+        }
+
+        var tabHtml
+        if (tab.length > 0) {
+            tabHtml = <Tab tab={tab} />
+        }
 
         if (wins !== undefined) {
             wins.map(win => {
                 var i = win.get('id')
+                if (editor.activeWins.indexOf(i) == -1) {
+                    return
+                }
                 // var winPos = win.get("pos")
                 // var winEnd = win.get("end")
                 var cursor = false
@@ -95,10 +116,20 @@ var EnvimEditor = React.createClass({
             })
         }
 
+        var style = {
+            height: (editor.height - 1) * 14 * 1.5,
+            backgroundColor: editor.bg,
+            position: "relative",
+        }
+
         return (
             <div>
+                {tabHtml}
+                <div style={style}>
                 {cmdHtml}
                 {winsElement}
+                {emsgHtml}
+                </div>
             </div>
         )
     }
@@ -216,9 +247,21 @@ class Editor {
                 case 'win_scroll':
                     this.win_scroll(arg.slice(1))
                     break
+                case 'tab':
+                    // console.log("win_update")
+                    this.tab(arg.slice(1))
+                    break
+                case 'win_clear':
+                    // console.log("win_update")
+                    this.win_clear(arg.slice(1))
+                    break
                 case 'win_update':
                     // console.log("win_update")
                     this.win_update(arg.slice(1))
+                    break
+                case 'win_close':
+                    // console.log("win_update")
+                    this.win_close(arg.slice(1))
                     break
                 case 'win_draw_sign':
                     // console.log("win_draw_sign")
@@ -240,6 +283,12 @@ class Editor {
                     break
                 case 'popupmenu_select':
                     this.popupmenu_select(arg.slice(1))
+                    break
+                // case 'msg':
+                //     this.msg(arg.slice(1))
+                //     break
+                case 'emsg':
+                    this.emsg(arg.slice(1))
                     break
                 case 'cmdline':
                     this.cmdline(arg.slice(1))
@@ -271,8 +320,12 @@ class Editor {
                     break
             }
         })
-        EnvimClass.setState(EnvimState)
+        this.update()
         this.release()
+    }
+
+    update() {
+        EnvimClass.setState(EnvimState)
     }
 
     redraw(args) {
@@ -364,6 +417,9 @@ class Editor {
                         numText = num.num
                     }
                     numText[col - (drawSign ? 2:0)] = c
+                    if (numText.length > numWidth) {
+                        numText = numText.splice(0, numWidth - 1)
+                    }
                     numColumn = numColumn.set(row, {'num': numText, 'highlight': highlight})
                 }
             }
@@ -522,6 +578,22 @@ class Editor {
         this.state.editor.cmdlinePos = arg[0]
     }
 
+    msg(args) {
+        var arg = args[0]
+        this.state.editor.msg = arg[0]
+    }
+
+    emsg(args) {
+        clearTimeout(hideEmsg)
+        var arg = args[0]
+        var self = this
+        this.state.editor.emsg = arg[0]
+        hideEmsg = setTimeout(function() {
+            self.state.editor.emsg = ""
+            self.update()
+        }, 5000)
+    }
+
     cmdline(args) {
         var arg = args[0]
         this.state.editor.cmdline = arg[0]
@@ -569,6 +641,9 @@ class Editor {
         var win = wins.get(winId)
         if (win === undefined) {
             win = Immutable.Map({
+                id: winId,
+                width: this.state.editor.width,
+                height: this.state.editor.height,
             })
         }
         win = win.set("cursorPos", [cursorRow, cursorCol])
@@ -577,17 +652,18 @@ class Editor {
 
     win_put(args) {
         var arg = args[0]
-        console.log("win_put")
-        console.log(args.map(arg => {return arg[1]}))
         var winId = arg[0]
         var char = arg[1]
         var wins = this.state.editor.wins
         var win = wins.get(winId)
-        var cursorPos = win.get("cursorPos")
         if (win === undefined) {
             win = Immutable.Map({
+                id: winId,
+                width: this.state.editor.width,
+                height: this.state.editor.height,
             })
         }
+        var cursorPos = win.get("cursorPos")
         if (cursorPos === undefined) {
             cursorPos = [0, 0]
         }
@@ -734,8 +810,26 @@ class Editor {
         this.state.editor.wins = wins
     }
 
+    win_close(args) {
+        var arg = args[0]
+        var winId = arg[0]
+        var wins = this.state.editor.wins
+        wins = wins.delete(winId)
+        this.state.editor.wins = wins
+    }
+
+    tab(args) {
+        var arg = args[0]
+        this.state.editor.tab = arg
+    }
+
+    win_clear(args) {
+        var arg = args[0]
+        this.state.editor.activeWins = arg
+    }
+
     win_update(args) {
-        console.log("win_update")
+        // console.log("win_update")
         var arg = args[0];
         var need_update = false;
         var wins = this.state.editor.wins
@@ -746,8 +840,10 @@ class Editor {
         var col = arg[4]
         var numWidth = arg[5]
         var drawSign = arg[6]
-        console.log("drawSign", drawSign)
         var win = wins.get(winId)
+        if (this.state.editor.activeWins.indexOf(winId) == -1) {
+            this.state.editor.activeWins.push(winId)
+        }
         if (win == undefined) {
             win = Immutable.Map({
                 id: winId,

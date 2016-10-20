@@ -35,12 +35,16 @@ class Window extends Component {
         var style = {
             width: win.get("width") * 7,
             height: win.get("height") * lineHeight,
-            position: "fixed",
+            position: "absolute",
             left: left,
             top: pos[0] * lineHeight,
             backgroundColor: bg,
             boxShadow: "inset -3px 0 0 rgba(0, 0, 0, 0.05)",
             color: fg,
+        }
+
+        if (win.get("statusLine")) {
+            style.height = style.height + lineHeight
         }
 
         if (left > 0) {
@@ -49,32 +53,40 @@ class Window extends Component {
             padding = 6
         }
 
+        if (pos[0] > 0) {
+            style.borderTop = "1px solid #000000"
+        }
+
         var popupmenuHtml
         if (popupmenuShow) {
             popupmenuHtml = <Popupmenu key={"popupmenu"} menu={popupmenu} />
         }
         var linesHtml = []
+        var cursorHtml
         if (cursor) {
             var pos = win.get("cursorPos")
-            linesHtml.push(<Cursor key={"cursor"} padding={padding} left={pos[1]} top={pos[0]} editor={editor} mode={editor.mode} />)
+            cursorHtml = <Cursor key={"cursor"} padding={padding} left={pos[1]} top={pos[0]} editor={editor} mode={editor.mode} />
         }
         lines.map((line, i) => {
+            if (line != undefined) {
             linesHtml.push(<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} i={i} lineObject={line} uniqueId={line.get("uniqueId")} />)
+            }
         })
         var signHtml
         if (win.get("drawSign")) {
-            signHtml = <Sign sign={win.get("signColumn")} height={win.get("height")} />
+            signHtml = <Sign bg={bg} fg={fg} sign={win.get("signColumn")} height={win.get("height")} />
         }
         var statusLineHtml
-        if (win.get("statusLine")) {
-            statusLineHtml = <StatusLine spans={win.get("statusLine").spans} height={win.get("height")} />
-        }
+        // if (win.get("statusLine")) {
+        //     statusLineHtml = <StatusLine spans={win.get("statusLine").spans} height={win.get("height")} width={win.get("width")} />
+        // }
 
         return <div style={style}>
+            {cursorHtml}
             {popupmenuHtml}
             {signHtml}
             {statusLineHtml}
-            <Number drawSign={win.get("drawSign")} numWidth={win.get("numWidth")} num={win.get("numColumn")} height={win.get("height")} />
+            <Number bg={bg} fg={fg} drawSign={win.get("drawSign")} numWidth={win.get("numWidth")} num={win.get("numColumn")} height={win.get("height")} />
             <div>{linesHtml}</div>
             </div>
     }

@@ -12,13 +12,14 @@ class Sign extends Component {
     }
 
     render() {
-        const { height, sign } = this.props
+        const { height, sign, bg } = this.props
         var style = {
-            position: "fixed",
+            position: "absolute",
+            backgroundColor: bg,
         }
         var signHtml = []
         for (var i = 0; i < height; i++) {
-            var signText = ''
+            var signText = '  '
             var signColumn = sign.get(i)
             if (signColumn != undefined) {
                signText = _.join(signColumn.sign, '')
