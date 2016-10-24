@@ -18,10 +18,12 @@ class Number extends Component {
             left = 2 * 7
         }
         var style = {
+            width: numWidth * 7,
             position: "absolute",
             left: left,
             paddingLeft: "inherit",
             backgroundColor: bg,
+            zIndex: 100,
         }
         var spanStyle = {
             float: "none",

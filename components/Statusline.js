@@ -33,12 +33,12 @@ export default class StatusLine extends Component {
                 if (i == lastIndex) {
                     last = true
                 }
-                spansHtml.push(<Span key={i} span={span} last={last} />)
+                spansHtml.push(<Span key={i} span={span} last={last} col={i} pos={[0, i]} />)
             }
         })
 
         var style = {
-            width: width * 7,
+            left: 0,
             position: "absolute",
             top: height * 14 * 1.5,
         }

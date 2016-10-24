@@ -16,7 +16,7 @@ export default class Line extends Component {
     }
 
     render() {
-        const { line, width } = this.props
+        const { line, width, row } = this.props
         if (line === undefined) {
             return <pre key={i}></pre>
         }
@@ -37,7 +37,7 @@ export default class Line extends Component {
                 if (i == lastIndex) {
                     last = true
                 }
-                spans.push(<Span key={i} span={span} last={last} />)
+                spans.push(<Span key={i} span={span} last={last} col={i} />)
             }
         })
 
@@ -60,14 +60,14 @@ export default class Line extends Component {
         //         spans.push(<Span />)
         //     }
         // }
-        // var style = {
-        //     position: "relative",
-        //     width: 300,
-        //     height: 14 * 1.5,
-        // }
+
+        var style = {
+            position: "relative",
+            height: 14 * 1.5,
+        }
 
         return (
-            <pre>{spans}</pre>
+            <pre style={style}>{spans}</pre>
         )
 
         var spans = []

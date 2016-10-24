@@ -13,6 +13,7 @@ class Popupmenu extends Component {
 
     render() {
         const { menu } = this.props
+        console.log("popupmenuShow", menu.get("show"))
         if (!menu.get("show")) {
             return <div></div>
         }

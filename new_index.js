@@ -32,7 +32,7 @@ var editor = {
     statusLine: true,
     cmdheight: 1,
     cursorPos: [0, 0],
-    cursorWin: 1,
+    cursorWin: 0,
     highlight: {},
     scroll: [],
     wins: Immutable.Map({}),
@@ -92,14 +92,15 @@ var EnvimEditor = React.createClass({
         if (wins !== undefined) {
             wins.map(win => {
                 var i = win.get('id')
-                if (editor.activeWins.indexOf(i) == -1) {
-                    return
+                var display = false
+                if (editor.activeWins.indexOf(i) != -1) {
+                    display = true
                 }
                 // var winPos = win.get("pos")
                 // var winEnd = win.get("end")
                 var cursor = false
                 var popupmenuShow = false
-                if (1 == editor.cursorWin) {
+                if (i == editor.cursorWin) {
                     cursor = true
                 }
                 if (i == editor.popupmenuWin) {
@@ -111,7 +112,7 @@ var EnvimEditor = React.createClass({
                 // if (win.get("cmd")) {
                 //     winsElement.push(<Cmd key={i} win={win} bg={editor.bg} fg={editor.fg} editor={editor} cursor={cursor} />)
                 // } else {
-                    winsElement.push(<Window key={i} win={win} bg={editor.bg} fg={editor.fg} editor={editor} cursor={cursor} popupmenuShow={popupmenuShow} popupmenu={editor.popupmenu} />)
+                    winsElement.push(<Window display={display} key={i} win={win} bg={editor.bg} fg={editor.fg} editor={editor} cursor={cursor} popupmenuShow={popupmenuShow} popupmenu={editor.popupmenu} />)
                 // }
             })
         }
@@ -208,6 +209,8 @@ class Editor {
     parseArgs(args) {
         args.map((arg, index) => {
             var e = arg[0]
+            // console.log(e)
+            // console.log(arg[1])
             switch (e) {
                 case 'cursor_goto':
                     break
@@ -254,6 +257,10 @@ class Editor {
                 case 'win_clear':
                     // console.log("win_update")
                     this.win_clear(arg.slice(1))
+                    break
+                case 'win_resize':
+                    // console.log("win_update")
+                    this.win_resize(arg.slice(1))
                     break
                 case 'win_update':
                     // console.log("win_update")
@@ -345,7 +352,7 @@ class Editor {
     }
 
     cursorGoto(args) {
-        this.state.editor = this.state.editor.set("cursorPos", args[0])
+        // this.state.editor = this.state.editor.set("cursorPos", args[0])
     }
 
     winCursorPos(pos) {
@@ -632,9 +639,9 @@ class Editor {
 
     win_cursor_goto(args) {
         var arg = args[0]
-        // console.log("win cursor goto")
         // console.log(arg[1], arg[2])
         var winId = arg[0]
+        // console.log("win cursor goto", winId, arg[1], arg[2])
         var cursorRow = arg[1]
         var cursorCol = arg[2]
         var wins = this.state.editor.wins
@@ -647,12 +654,14 @@ class Editor {
             })
         }
         win = win.set("cursorPos", [cursorRow, cursorCol])
+        this.state.editor.cursorWin = winId
         this.state.editor.wins = wins.set(winId, win)
     }
 
     win_put(args) {
         var arg = args[0]
         var winId = arg[0]
+        // console.log("win_put", winId, args.map(arg => {return arg[1]}))
         var char = arg[1]
         var wins = this.state.editor.wins
         var win = wins.get(winId)
@@ -674,40 +683,62 @@ class Editor {
         var drawSign = win.get("drawSign")
         var signColumn = win.get("signColumn")
         var numColumn = win.get("numColumn")
-        if (cursorPos[0] < height) {
-            var lines = win.get("lines")
-            if (lines === undefined) {
-                lines = Immutable.List()
+
+        var wincanvasId = "wincanvas" + winId
+        var c = document.getElementById(wincanvasId)
+        if (c != undefined) {
+            var ctx = c.getContext("2d")
+            var text = (args.map(arg => {return arg[1]})).join("")
+            ctx.clearRect(cursorPos[1] * 7, cursorPos[0] * 14 * 1.5, args.length * 7, 14 * 1.5)
+            if (this.state.editor.highlight.background != undefined) {
+                ctx.fillStyle = this.state.editor.highlight.background;
+                ctx.fillRect(cursorPos[1] * 7, cursorPos[0] * 14 * 1.5, args.length * 7, 14 * 1.5)
             }
-            var line = lines.get(cursorPos[0])
-            if (line === undefined) {
-                uniqueId = uniqueId + 1
-                line = Immutable.Map({
-                    uniqueId: uniqueId,
-                    spans: Immutable.List(),
-                })
+
+            ctx.font = "14px InconsolataforPowerline Nerd Font"
+            if (this.state.editor.highlight.foreground != undefined) {
+                ctx.fillStyle = this.state.editor.highlight.foreground;
+            } else {
+                ctx.fillStyle = this.state.editor.fg;
             }
-            var spans = line.get("spans")
-            var result = this.spansPut(spans, cursorPos[0], col, args.map(arg => {return arg[1]}), width, height, numWidth, drawSign, signColumn, numColumn)
-            signColumn = result[0]
-            numColumn = result[1]
-            if (spans != result[2]) {
-                line = line.set("spans", result[2])
-            }
-            lines = lines.set(cursorPos[0], line)
-            win = win.set("lines", lines)
-        } else {
-            var statusLine = win.get("statusLine")
-            if (statusLine === undefined) {
-                statusLine = {spans: Immutable.List()}
-            }
-            var spans = statusLine.spans
-            var result = this.spansPut(spans, cursorPos[0], col, args.map(arg => {return arg[1]}), width, height, numWidth, drawSign, signColumn, numColumn)
-            statusLine.spans = result[2]
-            win = win.set("statusLine", statusLine)
+            ctx.fillText(text, cursorPos[1] * 7, (cursorPos[0] + 1) * 14 * 1.5 - (4))
+            // console.log("ctx filltext", wincanvasId, text, cursorPos[1] * 7, (cursorPos[0] + 1) * 14)
+            // ctx.fillText(text, 0, 14)
         }
-        win = win.set("signColumn", signColumn)
-        win = win.set("numColumn", numColumn)
+        // if (cursorPos[0] < height) {
+        //     var lines = win.get("lines")
+        //     if (lines === undefined) {
+        //         lines = Immutable.List()
+        //     }
+        //     var line = lines.get(cursorPos[0])
+        //     if (line === undefined) {
+        //         uniqueId = uniqueId + 1
+        //         line = Immutable.Map({
+        //             uniqueId: uniqueId,
+        //             spans: Immutable.List(),
+        //         })
+        //     }
+        //     var spans = line.get("spans")
+        //     var result = this.spansPut(spans, cursorPos[0], col, args.map(arg => {return arg[1]}), width, height, numWidth, drawSign, signColumn, numColumn)
+        //     signColumn = result[0]
+        //     numColumn = result[1]
+        //     if (spans != result[2]) {
+        //         line = line.set("spans", result[2])
+        //     }
+        //     lines = lines.set(cursorPos[0], line)
+        //     win = win.set("lines", lines)
+        // } else {
+        //     var statusLine = win.get("statusLine")
+        //     if (statusLine === undefined) {
+        //         statusLine = {spans: Immutable.List()}
+        //     }
+        //     var spans = statusLine.spans
+        //     var result = this.spansPut(spans, cursorPos[0], col, args.map(arg => {return arg[1]}), width, height, numWidth, drawSign, signColumn, numColumn)
+        //     statusLine.spans = result[2]
+        //     win = win.set("statusLine", statusLine)
+        // }
+        // win = win.set("signColumn", signColumn)
+        // win = win.set("numColumn", numColumn)
         win = win.set("cursorPos", [cursorPos[0], cursorPos[1] + args.length])
         wins = wins.set(winId, win)
         this.state.editor.wins = wins
@@ -751,6 +782,34 @@ class Editor {
             win = Immutable.Map({
             })
         }
+
+        var startRow = 0
+        var destRow = 0
+        if (count > 0) {
+            startRow = count
+            height = height - count
+        } else {
+            destRow = -count
+            height = height + count
+        }
+
+        var wincanvasId = "wincanvas" + winId
+        var c = document.getElementById(wincanvasId)
+        if (c != undefined) {
+            var ctx = c.getContext("2d")
+            const captured = ctx.getImageData(
+                0, startRow * 14 * 1.5,
+                win.get("width") * 7,
+                height * 14 * 1.5
+            )
+            ctx.clearRect(0, 0, win.get("width") * 7, win.get("height") * 14 * 1.5)
+            ctx.putImageData(
+                captured,
+                0,
+                destRow * 14 * 1.5
+            );
+        }
+        return
         var lines = Immutable.List()
         var signColumn = Immutable.List()
         var numColumn = Immutable.List()
@@ -811,6 +870,7 @@ class Editor {
     }
 
     win_close(args) {
+        console.log("win_close")
         var arg = args[0]
         var winId = arg[0]
         var wins = this.state.editor.wins
@@ -825,19 +885,103 @@ class Editor {
 
     win_clear(args) {
         var arg = args[0]
+        console.log("win_clear", arg)
+        var wins = this.state.editor.wins
+        arg.forEach((winId, i) => {
+            var wincanvasId = "wincanvas" + winId
+            var c = document.getElementById(wincanvasId)
+            var win = wins.get(winId)
+            if (c != undefined) {
+                var ctx = c.getContext("2d")
+                ctx.clearRect(0, 0, win.get("width") * 7, (win.get("height") + 1) * 14 * 1.5)
+            }
+        })
         this.state.editor.activeWins = arg
+        wins.map((win, i) => {
+            win = win.delete("lines")
+            wins = wins.set(i, win)
+        })
+        this.state.editor.wins = wins
+    }
+
+    win_resize(args) {
+        var wins = this.state.editor.wins
+        var editor = this.state.editor
+        var arg = args[0]
+        arg.forEach((winArg) => {
+            var winId = winArg[0]
+            var width = winArg[1]
+            var height = winArg[2]
+            var oldWidth
+            var oldHeight
+            var row = winArg[3]
+            var col = winArg[4]
+            var win = wins.get(winId)
+            if (win === undefined) {
+                win = Immutable.Map({
+                    id: winId,
+                    width: width,
+                    height: height,
+                    row: row,
+                    col: col, 
+                })
+            } else {
+                oldWidth = win.get("width")
+                oldHeight = win.get("height")
+                win = win.merge(Immutable.Map({
+                    id: winId,
+                    width: width,
+                    height: height,
+                    row: row,
+                    col: col, 
+                }))
+            }
+            if (editor.activeWins.indexOf(winId) == -1) {
+                editor.activeWins.push(winId)
+            }
+            wins = wins.set(winId, win)
+            this.state.editor.wins = wins
+            this.update()
+            this.canvas_update(winId, oldWidth, oldHeight, width, height)
+        })
+        console.log("activeWins in win_resize", this.state.editor.activeWins)
+    }
+
+    canvas_update(winId, oldWidth, oldHeight, width, height) {
+        if (oldWidth == width && oldHeight == height) {
+            return
+        }
+
+        console.log("now update canvas", oldWidth, oldHeight, width, height)
+        var wincanvasId = "wincanvas" + winId
+        var c = document.getElementById(wincanvasId)
+        if (c != undefined) {
+            var ctx = c.getContext("2d")
+            var captured
+            if (oldWidth != undefined && oldHeight != undefined) {
+                captured = ctx.getImageData(0, 0, oldWidth * 7, (oldHeight + 1) * 14 * 1.5)
+            }
+            c.width = width * 7
+            c.height = (height + 1) * 14 * 1.5
+            if (captured != undefined) {
+                ctx.clearRect(0, 0, oldWidth * 7, (oldHeight + 1) * 14 * 1.5)
+                ctx.putImageData(captured, 0, 0)
+            }
+        }
     }
 
     win_update(args) {
-        // console.log("win_update")
         var arg = args[0];
         var need_update = false;
         var wins = this.state.editor.wins
         var winId = arg[0]
         var width = arg[1]
         var height = arg[2]
+        var oldWidth
+        var oldHeight
         var row = arg[3]
         var col = arg[4]
+        // console.log("win_update", winId, row, col)
         var numWidth = arg[5]
         var drawSign = arg[6]
         var win = wins.get(winId)
@@ -856,6 +1000,8 @@ class Editor {
             })
             need_update = true;
         } else {
+            oldWidth = win.get("width")
+            oldHeight = win.get("height")
             if (win.get("width") != width || win.get("height") != height || win.get("row") != row || win.get("col") != col || win.get("numWidth") != numWidth || win.get("drawSign") != drawSign) {
                 win = win.merge(Immutable.Map({
                     id: winId,
@@ -869,6 +1015,7 @@ class Editor {
                 need_update = true;
             }
         }
+        this.canvas_update(winId, oldWidth, oldHeight, width, height)
         if (need_update) {
             wins = wins.set(winId, win)
             this.state.editor.wins = wins
@@ -914,6 +1061,7 @@ class Editor {
     }
 
     highlightSet(args) {
+        // console.log("hightlight set", args.map(arg => {return arg[0]}))
         var newHighlight = this.state.editor.highlight
         args.forEach((arg) => {
             var highlight = arg[0]

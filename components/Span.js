@@ -11,13 +11,16 @@ export default class Span extends Component {
     }
 
     render() {
-        const { span, last, pos } = this.props
+        const { span, last, col } = this.props
         // console.log("render span", span.toJS())
         if (span === undefined) {
             return <span>{""}</span>
         }
         // console.log(span.toJS())
-        var style = {}
+        var style = {
+            position: "absolute",
+            left: col * 7,
+        }
         var highlight = {}
         if (span.get("highlight") != undefined) {
             highlight = span.get("highlight")
@@ -30,9 +33,9 @@ export default class Span extends Component {
         if (highlight.foreground != undefined) {
             style.color = highlight.foreground
         }
-        if (last) {
-            style.float = "none"
-        }
+        // if (last) {
+        //     style.float = "none"
+        // }
         // if (pos != undefined) {
         //     style.position = "absolute"
         //     style.left = pos * 7

@@ -16,6 +16,7 @@ class Sign extends Component {
         var style = {
             position: "absolute",
             backgroundColor: bg,
+            zIndex: 200,
         }
         var signHtml = []
         for (var i = 0; i < height; i++) {
