@@ -60,8 +60,9 @@ class Window extends Component {
 
         if (left > 0) {
             style.borderLeft = "1px solid #000000"
-            style.paddingLeft = 6
-            padding = 6
+            style.paddingLeft = 3
+            style.paddingRight = 3
+            padding = 3
         }
 
         var cursorHtml

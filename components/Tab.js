@@ -23,7 +23,8 @@ class Tab extends Component {
             if (active == item[0]) {
                 className = className + " activetab"
             }
-            spans.push(<li key={i} className={className}>{item[1]}</li>)
+            var tabText = item[1].slice(0, 30)
+            spans.push(<li key={i} className={className}>{tabText}</li>)
         })
 
         var style = {

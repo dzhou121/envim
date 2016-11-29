@@ -26,11 +26,27 @@ export default class Cmd extends Component {
     // }
 
     render() {
-        const { editor } = this.props
+        const { editor, wildmenu, wildmenuMatch } = this.props
         var { text, pos } = this.props
         if (text == "") {
             text = " "
         }
+
+        var menuHtml = []
+        wildmenu.forEach((item, i) => {
+            var preStyle = {
+                lineHeight: 2,
+            }
+            var innerstyle = {
+                backgroundColor: "#0e1112",
+                color: "#cdd3de",
+            }
+            if (i == wildmenuMatch) {
+                innerstyle.backgroundColor = "#519aba"
+            }
+            menuHtml.push(<pre style={preStyle}><span style={innerstyle}>{item}</span></pre>)
+        })
+
         var chars = 70
         var width = 7 * chars
         var padding = 21
@@ -67,6 +83,7 @@ export default class Cmd extends Component {
         return <div style={style}>
             <Cursor padding={padding} top={top} left={left} editor={editor} mode={"insert"} />
             <pre>{spansHtml}</pre>
+            {menuHtml}
             </div>
     }
 }

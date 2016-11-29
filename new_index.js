@@ -1,5 +1,6 @@
 import * as neovimClient from 'neovim-client'
 import {spawn } from 'child_process'
+import {remote} from 'electron';
 import Immutable from 'immutable'
 import * as Promise from 'bluebird'
 import * as _ from 'lodash'
@@ -23,9 +24,11 @@ var editor = {
     emsg: "",
     msg: "",
     cmdline: "",
+    wildmenu: [],
+    wildmenuMatch: -1,
     cmdlineShow: false,
-    width: 200,
-    height: 50,
+    width: 366,
+    height: 63,
     mode: "normal",
     lineHeight: 1.5,
     fontSize: 14,
@@ -46,6 +49,14 @@ var editor = {
     }),
     popupmenuWin: 1,
 }
+
+const ThisBrowserWindow = remote.getCurrentWindow();
+console.log("BrowserWindow's size", ThisBrowserWindow.getContentSize())
+var size = ThisBrowserWindow.getContentSize()
+editor.width = Math.round(size[0] / 7, 0)
+editor.height = Math.round((size[1] - 34) / (14 * 1.5))
+const pixel_ratio = window.devicePixelRatio || 1
+console.log("pixel ratio is", pixel_ratio)
 
 var cmdPos = [editor.height - editor.cmdheight, 0]
 var cmdEnd = [editor.height, editor.width - 1]
@@ -77,7 +88,7 @@ var EnvimEditor = React.createClass({
 
         var cmdHtml
         if (editor.cmdlineShow) {
-            cmdHtml = <Cmd text={editor.cmdline} pos={editor.cmdlinePos} editor={editor} />
+            cmdHtml = <Cmd wildmenu={editor.wildmenu} wildmenuMatch={editor.wildmenuMatch} text={editor.cmdline} pos={editor.cmdlinePos} editor={editor} />
         }
         var emsgHtml
         if (editor.emsg != "") {
@@ -164,6 +175,8 @@ function initEditor() {
                     key = '<C-' + key + '>'
                 } else if (e.altKey) {
                     let input = event.key;
+                    key = '<A-' + String.fromCharCode(e.keyCode).toLowerCase() + '>'
+                } else if (e.metaKey) {
                     key = '<A-' + String.fromCharCode(e.keyCode).toLowerCase() + '>'
                 }
                 // console.log("keydown",e, key)
@@ -299,6 +312,12 @@ class Editor {
                     break
                 case 'cmdline':
                     this.cmdline(arg.slice(1))
+                    break
+                case 'wild_menu':
+                    this.wild_menu(arg.slice(1))
+                    break
+                case 'wild_menu_clean':
+                    this.wild_menu_clean(arg.slice(1))
                     break
                 case 'cmdlinepos':
                     this.cmdlinepos(arg.slice(1))
@@ -607,6 +626,17 @@ class Editor {
         this.state.editor.cmdlinePos = arg[1]
     }
 
+    wild_menu(args) {
+        var arg = args[0]
+        this.state.editor.wildmenuMatch = arg[0]
+        this.state.editor.wildmenu = arg.slice(1)
+    }
+
+    wild_menu_clean(args) {
+        this.state.editor.wildmenu = []
+        this.state.editor.wildmenuMatch = -1
+    }
+
     command_line_enter(args) {
         this.state.editor.cmdlineShow = true
     }
@@ -688,20 +718,26 @@ class Editor {
         var c = document.getElementById(wincanvasId)
         if (c != undefined) {
             var ctx = c.getContext("2d")
+            // var backingStoreRatio = ctx.webkitBackingStorePixelRatio ||
+            //                 ctx.mozBackingStorePixelRatio ||
+            //                 ctx.msBackingStorePixelRatio ||
+            //                 ctx.oBackingStorePixelRatio ||
+            //                 ctx.backingStorePixelRatio || 1
+            // console.log("backingStoreRatio is", backingStoreRatio)
             var text = (args.map(arg => {return arg[1]})).join("")
-            ctx.clearRect(cursorPos[1] * 7, cursorPos[0] * 14 * 1.5, args.length * 7, 14 * 1.5)
+            ctx.clearRect(cursorPos[1] * 7 * pixel_ratio, cursorPos[0] * 14 * 1.5 * pixel_ratio, args.length * 7 * pixel_ratio, 14 * 1.5 * pixel_ratio)
             if (this.state.editor.highlight.background != undefined) {
                 ctx.fillStyle = this.state.editor.highlight.background;
-                ctx.fillRect(cursorPos[1] * 7, cursorPos[0] * 14 * 1.5, args.length * 7, 14 * 1.5)
+                ctx.fillRect(cursorPos[1] * 7 * pixel_ratio, cursorPos[0] * 14 * 1.5 * pixel_ratio, args.length * 7 * pixel_ratio, 14 * 1.5 * pixel_ratio)
             }
 
-            ctx.font = "14px InconsolataforPowerline Nerd Font"
+            ctx.font = (14 * pixel_ratio) + "px InconsolataforPowerline Nerd Font"
             if (this.state.editor.highlight.foreground != undefined) {
                 ctx.fillStyle = this.state.editor.highlight.foreground;
             } else {
                 ctx.fillStyle = this.state.editor.fg;
             }
-            ctx.fillText(text, cursorPos[1] * 7, (cursorPos[0] + 1) * 14 * 1.5 - (4))
+            ctx.fillText(text, cursorPos[1] * 7 * pixel_ratio, (cursorPos[0] + 1) * 14 * 1.5 * pixel_ratio - (6 * pixel_ratio))
             // console.log("ctx filltext", wincanvasId, text, cursorPos[1] * 7, (cursorPos[0] + 1) * 14)
             // ctx.fillText(text, 0, 14)
         }
@@ -797,16 +833,32 @@ class Editor {
         var c = document.getElementById(wincanvasId)
         if (c != undefined) {
             var ctx = c.getContext("2d")
-            const captured = ctx.getImageData(
-                0, startRow * 14 * 1.5,
-                win.get("width") * 7,
-                height * 14 * 1.5
-            )
-            ctx.clearRect(0, 0, win.get("width") * 7, win.get("height") * 14 * 1.5)
-            ctx.putImageData(
-                captured,
+            var width = win.get("width") * 7 * pixel_ratio
+            var height = height * 14 * 1.5 * pixel_ratio
+            var startY = startRow * 14 * 1.5 * pixel_ratio
+            var destY = destRow * 14 * 1.5 * pixel_ratio
+
+            var buffer = document.createElement('canvas');
+            buffer.width = width
+            buffer.height = height
+            buffer.getContext('2d').drawImage(c,
                 0,
-                destRow * 14 * 1.5
+                startY, width, height,
+                0,
+                0, width, height
+            );
+
+            ctx.clearRect(0, 0, width, win.get("height") * 14 * 1.5 * pixel_ratio)
+            ctx.drawImage(buffer,
+                0, destY, width, height)
+
+            return
+            const captured = ctx.getImageData(
+                0, startY, width, height
+            )
+            ctx.clearRect(0, 0, width, win.get("height") * 14 * 1.5 * pixel_ratio)
+            ctx.putImageData(
+                captured, 0, destY
             );
         }
         return
@@ -893,7 +945,7 @@ class Editor {
             var win = wins.get(winId)
             if (c != undefined) {
                 var ctx = c.getContext("2d")
-                ctx.clearRect(0, 0, win.get("width") * 7, (win.get("height") + 1) * 14 * 1.5)
+                ctx.clearRect(0, 0, win.get("width") * 7 * pixel_ratio, (win.get("height") + 1) * 14 * 1.5 * pixel_ratio)
             }
         })
         this.state.editor.activeWins = arg
@@ -944,10 +996,26 @@ class Editor {
             this.update()
             this.canvas_update(winId, oldWidth, oldHeight, width, height)
         })
-        console.log("activeWins in win_resize", this.state.editor.activeWins)
+        // console.log("activeWins in win_resize", this.state.editor.activeWins)
     }
 
     canvas_update(winId, oldWidth, oldHeight, width, height) {
+        if (oldWidth != undefined && oldHeight != undefined) {
+            return
+        } else {
+            var width = this.state.editor.width
+            var height = this.state.editor.height
+            var wincanvasId = "wincanvas" + winId
+            var c = document.getElementById(wincanvasId)
+            if (c != undefined) {
+                c.width = width * 7 * pixel_ratio
+                c.height = (height + 1) * 14 * 1.5 * pixel_ratio
+                c.style.width = (c.width / pixel_ratio) + 'px'
+                c.style.height = (c.height / pixel_ratio) + 'px'
+            }
+            return
+        }
+
         if (oldWidth == width && oldHeight == height) {
             return
         }
@@ -959,12 +1027,14 @@ class Editor {
             var ctx = c.getContext("2d")
             var captured
             if (oldWidth != undefined && oldHeight != undefined) {
-                captured = ctx.getImageData(0, 0, oldWidth * 7, (oldHeight + 1) * 14 * 1.5)
+                captured = ctx.getImageData(0, 0, oldWidth * 7 * pixel_ratio, (oldHeight + 1) * 14 * 1.5 * pixel_ratio)
             }
-            c.width = width * 7
-            c.height = (height + 1) * 14 * 1.5
+            c.width = width * 7 * pixel_ratio
+            c.height = (height + 1) * 14 * 1.5 * pixel_ratio
+            c.style.width = (c.width / pixel_ratio) + 'px'
+            c.style.height = (c.height / pixel_ratio) + 'px'
             if (captured != undefined) {
-                ctx.clearRect(0, 0, oldWidth * 7, (oldHeight + 1) * 14 * 1.5)
+                ctx.clearRect(0, 0, oldWidth * 7 * pixel_ratio, (oldHeight + 1) * 14 * 1.5 * pixel_ratio)
                 ctx.putImageData(captured, 0, 0)
             }
         }
