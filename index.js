@@ -199,6 +199,9 @@ function initEditor() {
                 } else if (e.metaKey) {
                     key = '<A-' + String.fromCharCode(e.keyCode).toLowerCase() + '>'
                 }
+                if (key == "<") {
+                    key = '<LT>'
+                }
                 // console.log("keydown",e, key)
                 nvim.input(key)
             })
