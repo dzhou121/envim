@@ -8,6 +8,7 @@ class Cursor extends Component {
 
     render() {
         const { editor, left, top, padding, mode } = this.props
+        console.log("win cusor", left, top)
 
         var fontSize = editor.fontSize
         var lineHeight = editor.lineHeight

@@ -32,8 +32,7 @@ class Window extends Component {
     }
 
     shouldComponentUpdate(nextProps, nextState) {
-        return true
-        return (nextProps.win != this.props.win) || (this.props.cursor != nextProps.cursor) || (this.props.popupmenu != nextProps.popupmenu) || (this.props.popupmenuShow != nextProps.popupmenuShow)
+        return (nextProps.win != this.props.win) || (this.props.cursor != nextProps.cursor) || (this.props.popupmenu != nextProps.popupmenu) || (this.props.popupmenuShow != nextProps.popupmenuShow) || (nextProps.display != this.props.display) || (this.props.win.get("floating"))
     }
 
     render() {
@@ -53,16 +52,32 @@ class Window extends Component {
             backgroundColor: bg,
             boxShadow: "inset -3px 0 0 rgba(0, 0, 0, 0.05)",
             color: fg,
+            zIndex: pos[0] + pos[1],
         }
         if (!display) {
             style.display = "none"
         }
 
+        var padding = 0
         if (left > 0) {
             style.borderLeft = "1px solid #000000"
             style.paddingLeft = 3
             style.paddingRight = 3
             padding = 3
+        }
+
+        if (win.get("floating")){
+            var editorCursorPos = editor.cursorPos
+            style.zIndex = 1000
+            style.left = (editor.width * 7 - 100 * 7) / 2
+            style.top = 0
+            style.border = "1px solid #000000"
+            style.boxShadow = "0 0 10px #000"
+            style.backgroundColor = "#000"
+            if (win.get("preview") && !cursor) {
+                style.left = editorCursorPos[1] * 7
+                style.top = (editorCursorPos[0] + 1) * 14 * 1.5
+            }
         }
 
         var cursorHtml
@@ -75,11 +90,22 @@ class Window extends Component {
             popupmenuHtml = <Popupmenu key={"popupmenu"} menu={popupmenu} />
         }
 
+        var canvasBaseWidth = editor.width
+        var canvasBaseHeight = editor.height
+        if (win.get("floating")) {
+            canvasBaseWidth = win.get("width")
+            canvasBaseHeight = win.get("height")
+        }
+        var canvasStyle = {
+            width: canvasBaseWidth * 7,
+            height: (canvasBaseHeight + 1) *  14 * 1.5 ,
+        }
+
         //<canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} width={win.get("width") * 7} height={(win.get("height") + 1) * 14 * 1.5} />
         return <div id={"windiv" + win.get("id")} style={style}>
             {popupmenuHtml}
             {cursorHtml}
-            <canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} />
+            <canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} style={canvasStyle} width={canvasBaseWidth * 7 * editor.pixel_ratio} height={(canvasBaseHeight + 1) * 14 * 1.5 * editor.pixel_ratio} />
             </div>
         var lines = win.get("lines")
 

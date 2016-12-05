@@ -51,7 +51,7 @@ export default class Cmd extends Component {
         var width = 7 * chars
         var padding = 21
         var style = {
-            zIndex: 100,
+            zIndex: 1000,
             position: "absolute",
             backgroundColor: "#0e1112",
             color: "#cdd3de",

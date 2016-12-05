@@ -12,6 +12,7 @@ import Cursor from './components/Cursor'
 import Cmd from './components/Cmd'
 import Popupmenu from './components/Popupmenu'
 import Emsg from './components/Emsg'
+import Msg from './components/Msg'
 import Tab from './components/Tab'
 
 var uniqueId = 0
@@ -19,6 +20,7 @@ var uniqueId = 0
 var lock = new ReadWriteLock()
 
 var hideEmsg
+var hideMsg
 
 var editor = {
     emsg: "",
@@ -48,14 +50,16 @@ var editor = {
         items: [],
     }),
     popupmenuWin: 1,
+    previewWin: 0,
 }
 
 const ThisBrowserWindow = remote.getCurrentWindow();
 console.log("BrowserWindow's size", ThisBrowserWindow.getContentSize())
 var size = ThisBrowserWindow.getContentSize()
 editor.width = Math.round(size[0] / 7, 0)
-editor.height = Math.round((size[1] - 34) / (14 * 1.5))
+editor.height = Math.round((size[1] - 34) / (14 * 1.5)) + 1
 const pixel_ratio = window.devicePixelRatio || 1
+editor.pixel_ratio = pixel_ratio
 console.log("pixel ratio is", pixel_ratio)
 
 var cmdPos = [editor.height - editor.cmdheight, 0]
@@ -94,6 +98,10 @@ var EnvimEditor = React.createClass({
         if (editor.emsg != "") {
             emsgHtml = <Emsg emsg={editor.emsg} />
         }
+        var msgHtml
+        if (editor.msg != "") {
+            msgHtml = <Msg msg={editor.msg} />
+        }
 
         var tabHtml
         if (tab.length > 0) {
@@ -113,6 +121,8 @@ var EnvimEditor = React.createClass({
                 var popupmenuShow = false
                 if (i == editor.cursorWin) {
                     cursor = true
+                    var winCursorPos = win.get("cursorPos")
+                    editor.cursorPos = [win.get("row") + winCursorPos[0], win.get("col") + winCursorPos[1]]
                 }
                 if (i == editor.popupmenuWin) {
                     popupmenuShow = true
@@ -134,13 +144,23 @@ var EnvimEditor = React.createClass({
             position: "relative",
         }
 
+        var msgStyle = {
+            position: "absolute",
+            right: 0,
+            top: 0,
+            zIndex: 1000,
+        }
+
         return (
             <div>
                 {tabHtml}
                 <div style={style}>
                 {cmdHtml}
                 {winsElement}
-                {emsgHtml}
+                <div style={msgStyle}>
+                  {emsgHtml}
+                  {msgHtml}
+                </div>
                 </div>
             </div>
         )
@@ -303,6 +323,12 @@ class Editor {
                     break
                 case 'popupmenu_select':
                     this.popupmenu_select(arg.slice(1))
+                    break
+                case 'echo':
+                    this.msg(arg.slice(1))
+                    break
+                case 'echomsg':
+                    this.msg(arg.slice(1))
                     break
                 // case 'msg':
                 //     this.msg(arg.slice(1))
@@ -605,8 +631,14 @@ class Editor {
     }
 
     msg(args) {
+        clearTimeout(hideMsg)
         var arg = args[0]
+        var self = this
         this.state.editor.msg = arg[0]
+        hideMsg = setTimeout(function() {
+            self.state.editor.msg = ""
+            self.update()
+        }, 5000)
     }
 
     emsg(args) {
@@ -737,7 +769,9 @@ class Editor {
             } else {
                 ctx.fillStyle = this.state.editor.fg;
             }
-            ctx.fillText(text, cursorPos[1] * 7 * pixel_ratio, (cursorPos[0] + 1) * 14 * 1.5 * pixel_ratio - (6 * pixel_ratio))
+            if (text.trim()) {
+              ctx.fillText(text, cursorPos[1] * 7 * pixel_ratio, (cursorPos[0] + 1) * 14 * 1.5 * pixel_ratio - (6 * pixel_ratio))
+            }
             // console.log("ctx filltext", wincanvasId, text, cursorPos[1] * 7, (cursorPos[0] + 1) * 14)
             // ctx.fillText(text, 0, 14)
         }
@@ -948,18 +982,19 @@ class Editor {
                 ctx.clearRect(0, 0, win.get("width") * 7 * pixel_ratio, (win.get("height") + 1) * 14 * 1.5 * pixel_ratio)
             }
         })
-        this.state.editor.activeWins = arg
-        wins.map((win, i) => {
-            win = win.delete("lines")
-            wins = wins.set(i, win)
-        })
-        this.state.editor.wins = wins
+        // this.state.editor.activeWins = arg
+        // wins.map((win, i) => {
+        //     win = win.delete("lines")
+        //     wins = wins.set(i, win)
+        // })
+        // this.state.editor.wins = wins
     }
 
     win_resize(args) {
         var wins = this.state.editor.wins
         var editor = this.state.editor
         var arg = args[0]
+        var activeWins = []
         arg.forEach((winArg) => {
             var winId = winArg[0]
             var width = winArg[1]
@@ -968,6 +1003,11 @@ class Editor {
             var oldHeight
             var row = winArg[3]
             var col = winArg[4]
+            var floating = winArg[5]
+            var preview = winArg[6]
+            if (floating) {
+                editor.previewWin = winId
+            }
             var win = wins.get(winId)
             if (win === undefined) {
                 win = Immutable.Map({
@@ -976,6 +1016,8 @@ class Editor {
                     height: height,
                     row: row,
                     col: col, 
+                    floating: floating,
+                    preview: preview,
                 })
             } else {
                 oldWidth = win.get("width")
@@ -986,16 +1028,18 @@ class Editor {
                     height: height,
                     row: row,
                     col: col, 
+                    floating: floating,
+                    preview: preview,
                 }))
             }
-            if (editor.activeWins.indexOf(winId) == -1) {
-                editor.activeWins.push(winId)
-            }
+            activeWins.push(winId)
+            editor.activeWins = activeWins
             wins = wins.set(winId, win)
             this.state.editor.wins = wins
-            this.update()
-            this.canvas_update(winId, oldWidth, oldHeight, width, height)
+            // this.update()
+            // this.canvas_update(winId, oldWidth, oldHeight, width, height)
         })
+        this.update()
         // console.log("activeWins in win_resize", this.state.editor.activeWins)
     }
 
