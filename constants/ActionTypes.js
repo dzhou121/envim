@@ -1,8 +1,0 @@
-export const ADD_TODO = 'ADD_TODO'
-export const SET_ENVIM = 'SET_ENVIM'
-export const SET_WINDOWS = 'SET_WINDOWS'
-export const SET_BG = 'SET_BG'
-export const SET_FG = 'SET_FG'
-export const SET_CURSOR = 'SET_CURSOR'
-export const SET_LINES = 'SET_LINES'
-export const SET_EDITOR = 'SET_EDITOR'
