@@ -16,6 +16,8 @@ const template = [
   },
 ]
 
+// app.commandLine.appendSwitch('--force-gpu-rasterization')
+app.commandLine.appendSwitch('--disable-accelerated-2d-canvas')
 app.on('window-all-closed', () => {
     if (process.platform != 'darwin') {
         app.quit();
@@ -36,5 +38,6 @@ app.on('ready', () => {
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
+    // mainWindow.loadURL('chrome://gpu');
     mainWindow.loadURL('file://' + __dirname + '/index.html');
 });

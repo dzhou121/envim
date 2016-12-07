@@ -37,20 +37,24 @@ class Window extends Component {
 
     render() {
         const { display, win, bg, fg, editor, cursor, popupmenuShow, popupmenu } = this.props
-        var lineHeight = 14 * 1.5
+        var lineHeight = editor.lineHeight
+        if (win.get("floating")) {
+            lineHeight = editor.floatingLineHeight
+        }
+        var fontSize = editor.fontSize
         var pos = [win.get("row"), win.get("col")]
         var left = 0
         if (pos[1] > 0) {
-            var left = (pos[1] - 1 ) * 7
+            var left = (pos[1] - 1 ) * (fontSize / 2)
         }
         var style = {
-            width: win.get("width") * 7,
-            height: win.get("height") * lineHeight,
+            width: win.get("width") * (fontSize / 2),
+            height: win.get("height") * fontSize * lineHeight,
             position: "absolute",
             left: left,
-            top: pos[0] * lineHeight,
+            top: pos[0] * fontSize * lineHeight,
             backgroundColor: bg,
-            boxShadow: "inset -3px 0 0 rgba(0, 0, 0, 0.05)",
+            boxShadow: "inset -3px 0px 10px -3px rgba(0, 0, 0, 0.75)",
             color: fg,
             zIndex: pos[0] + pos[1],
         }
@@ -68,22 +72,35 @@ class Window extends Component {
 
         if (win.get("floating")){
             var editorCursorPos = editor.cursorPos
-            style.zIndex = 1000
-            style.left = (editor.width * 7 - 100 * 7) / 2
+            style.zIndex = 500
+            style.left = (editor.width - 100) * (fontSize / 2) / 2
             style.top = 0
             style.border = "1px solid #000000"
             style.boxShadow = "0 0 10px #000"
-            style.backgroundColor = "#000"
+            style.backgroundColor = "#15191b"
             if (win.get("preview") && !cursor) {
-                style.left = editorCursorPos[1] * 7
-                style.top = (editorCursorPos[0] + 1) * 14 * 1.5
+                style.left = editorCursorPos[1] * (fontSize / 2)
+                style.top = (editorCursorPos[0] + 1) * fontSize * lineHeight
             }
         }
 
         var cursorHtml
+        var cursorMsgHtml
         if (cursor) {
             var pos = win.get("cursorPos")
-            cursorHtml = <Cursor key={"cursor"} padding={padding} left={pos[1]} top={pos[0]} editor={editor} mode={editor.mode} />
+            cursorHtml = <Cursor key={"cursor"} padding={padding} left={pos[1]} top={pos[0]} editor={editor} mode={editor.mode} lineHeight={lineHeight} />
+            if (editor.cursormsg) {
+                var cursorMsgStyle = {
+                    position: "absolute",
+                    left: pos[1] * (fontSize / 2) + padding,
+                    top: (pos[0] + 1) * fontSize * lineHeight + 4,
+                    fontSize: 12,
+                    padding: "4px 6px 4px 6px",
+                    backgroundColor: "#d4d7d6",
+                    color: "#0e1112",
+                }
+                cursorMsgHtml = <div className="linter" style={cursorMsgStyle}><span>{editor.cursormsg}</span></div>
+            }
         }
         var popupmenuHtml
         if (popupmenuShow) {
@@ -97,80 +114,16 @@ class Window extends Component {
             canvasBaseHeight = win.get("height")
         }
         var canvasStyle = {
-            width: canvasBaseWidth * 7,
-            height: (canvasBaseHeight + 1) *  14 * 1.5 ,
+            width: canvasBaseWidth * (fontSize / 2),
+            height: (canvasBaseHeight + 1) *  fontSize * lineHeight ,
         }
 
-        //<canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} width={win.get("width") * 7} height={(win.get("height") + 1) * 14 * 1.5} />
+        //<canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} width={win.get("width") * (fontSize / 2)} height={(win.get("height") + 1) * 14 * 1.5} />
         return <div id={"windiv" + win.get("id")} style={style}>
             {popupmenuHtml}
             {cursorHtml}
-            <canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} style={canvasStyle} width={canvasBaseWidth * 7 * editor.pixel_ratio} height={(canvasBaseHeight + 1) * 14 * 1.5 * editor.pixel_ratio} />
-            </div>
-        var lines = win.get("lines")
-
-        if (lines === undefined) {
-            lines = []
-        }
-
-        var lineHeight = 14 * 1.5
-        var padding = 0
-
-        var pos = [win.get("row"), win.get("col")]
-        var left = 0
-        if (pos[1] > 0) {
-            var left = (pos[1] - 1 ) * 7
-        }
-
-        var style = {
-            width: win.get("width") * 7,
-            height: win.get("height") * lineHeight,
-            position: "absolute",
-            left: left,
-            top: pos[0] * lineHeight,
-            backgroundColor: bg,
-            boxShadow: "inset -3px 0 0 rgba(0, 0, 0, 0.05)",
-            color: fg,
-        }
-
-        if (left > 0) {
-            style.borderLeft = "1px solid #000000"
-            style.paddingLeft = 6
-            padding = 6
-        }
-
-        var popupmenuHtml
-        if (popupmenuShow) {
-            popupmenuHtml = <Popupmenu key={"popupmenu"} menu={popupmenu} />
-        }
-        var linesHtml = []
-        var cursorHtml
-        if (cursor) {
-            var pos = win.get("cursorPos")
-            cursorHtml = <Cursor key={"cursor"} padding={padding} left={pos[1]} top={pos[0]} editor={editor} mode={editor.mode} />
-        }
-        lines.map((line, i) => {
-            if (line != undefined) {
-                linesHtml.push(<Line key={line.get("uniqueId")} line={line.get("spans")} width={win.get("width")} i={i} lineObject={line} uniqueId={line.get("uniqueId")} row={i} />)
-            }
-        })
-        var signHtml
-        if (win.get("drawSign")) {
-            signHtml = <Sign bg={bg} fg={fg} sign={win.get("signColumn")} height={win.get("height")} />
-        }
-        var statusLineHtml
-        if (win.get("statusLine")) {
-            statusLineHtml = <StatusLine spans={win.get("statusLine").spans} height={win.get("height")} width={win.get("width")} />
-        }
-
-        return <div style={style}>
-            <canvas id={"wincanvas" + win.get("id")} width={win.get("width") * 7} height={win.get("height") * 14 * 1.5} />
-            {cursorHtml}
-            {popupmenuHtml}
-            {signHtml}
-            {statusLineHtml}
-            <Number bg={bg} fg={fg} drawSign={win.get("drawSign")} numWidth={win.get("numWidth")} num={win.get("numColumn")} height={win.get("height")} />
-            <div>{linesHtml}</div>
+            {cursorMsgHtml}
+            <canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} style={canvasStyle} width={canvasBaseWidth * (fontSize / 2) * editor.pixel_ratio} height={(canvasBaseHeight + 1) * fontSize * lineHeight * editor.pixel_ratio} />
             </div>
     }
 }

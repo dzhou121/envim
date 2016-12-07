@@ -8,10 +8,12 @@ class Cursor extends Component {
 
     render() {
         const { editor, left, top, padding, mode } = this.props
-        console.log("win cusor", left, top)
+        var { lineHeight } = this.props
 
         var fontSize = editor.fontSize
-        var lineHeight = editor.lineHeight
+        if (lineHeight == undefined) {
+            lineHeight = editor.lineHeight
+        }
         var fg = editor.fg
 
         var style = {
@@ -19,7 +21,7 @@ class Cursor extends Component {
             height: fontSize * lineHeight,
             position: "absolute",
             left: left * fontSize / 2 + padding,
-            zIndex: 300,
+            zIndex: 1300,
         }
         if (top != undefined) {
             style.top = top * fontSize * lineHeight

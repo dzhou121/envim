@@ -18,13 +18,13 @@ import Tab from './components/Tab'
 var uniqueId = 0
 
 var lock = new ReadWriteLock()
-
 var hideEmsg
 var hideMsg
 
 var editor = {
     emsg: "",
     msg: "",
+    cursormsg: "",
     cmdline: "",
     wildmenu: [],
     wildmenuMatch: -1,
@@ -33,6 +33,7 @@ var editor = {
     height: 63,
     mode: "normal",
     lineHeight: 1.5,
+    floatingLineHeight: 2,
     fontSize: 14,
     statusLine: true,
     cmdheight: 1,
@@ -56,8 +57,8 @@ var editor = {
 const ThisBrowserWindow = remote.getCurrentWindow();
 console.log("BrowserWindow's size", ThisBrowserWindow.getContentSize())
 var size = ThisBrowserWindow.getContentSize()
-editor.width = Math.round(size[0] / 7, 0)
-editor.height = Math.round((size[1] - 34) / (14 * 1.5)) + 1
+editor.width = Math.round(size[0] / (editor.fontSize / 2), 0)
+editor.height = Math.round((size[1] - 34) / (editor.fontSize * editor.lineHeight)) + 1
 const pixel_ratio = window.devicePixelRatio || 1
 editor.pixel_ratio = pixel_ratio
 console.log("pixel ratio is", pixel_ratio)
@@ -89,6 +90,8 @@ var EnvimEditor = React.createClass({
         var wins = editor.wins
         var pos = editor.cursorPos
         var tab = editor.tab
+        var fontSize = this.state.editor.fontSize
+        var lineHeight = this.state.editor.lineHeight
 
         var cmdHtml
         if (editor.cmdlineShow) {
@@ -139,7 +142,7 @@ var EnvimEditor = React.createClass({
         }
 
         var style = {
-            height: (editor.height - 1) * 14 * 1.5,
+            height: (editor.height - 1) * fontSize * lineHeight,
             backgroundColor: editor.bg,
             position: "relative",
         }
@@ -243,6 +246,7 @@ class Editor {
     }
 
     parseArgs(args) {
+        this.state.editor.cursormsg = ""
         args.map((arg, index) => {
             var e = arg[0]
             // console.log(e)
@@ -634,14 +638,19 @@ class Editor {
     }
 
     msg(args) {
-        clearTimeout(hideMsg)
         var arg = args[0]
         var self = this
-        this.state.editor.msg = arg[0]
-        hideMsg = setTimeout(function() {
-            self.state.editor.msg = ""
-            self.update()
-        }, 5000)
+        var msg = arg[0]
+        if (msg.startsWith("__cursor__")) {
+            this.state.editor.cursormsg = msg.slice(10)
+        } else {
+            clearTimeout(hideMsg)
+            this.state.editor.msg = arg[0]
+            hideMsg = setTimeout(function() {
+                self.state.editor.msg = ""
+                self.update()
+            }, 5000)
+        }
     }
 
     emsg(args) {
@@ -737,6 +746,11 @@ class Editor {
                 height: this.state.editor.height,
             })
         }
+        var fontSize = this.state.editor.fontSize
+        var lineHeight = this.state.editor.lineHeight
+        if (win.get("floating")) {
+            lineHeight = this.state.editor.floatingLineHeight
+        }
         var cursorPos = win.get("cursorPos")
         if (cursorPos === undefined) {
             cursorPos = [0, 0]
@@ -760,20 +774,26 @@ class Editor {
             //                 ctx.backingStorePixelRatio || 1
             // console.log("backingStoreRatio is", backingStoreRatio)
             var text = (args.map(arg => {return arg[1]})).join("")
-            ctx.clearRect(cursorPos[1] * 7 * pixel_ratio, cursorPos[0] * 14 * 1.5 * pixel_ratio, args.length * 7 * pixel_ratio, 14 * 1.5 * pixel_ratio)
+            ctx.clearRect(cursorPos[1] * (fontSize / 2) * pixel_ratio, cursorPos[0] * fontSize * lineHeight * pixel_ratio, args.length * (fontSize / 2) * pixel_ratio, fontSize * lineHeight * pixel_ratio)
             if (this.state.editor.highlight.background != undefined) {
                 ctx.fillStyle = this.state.editor.highlight.background;
-                ctx.fillRect(cursorPos[1] * 7 * pixel_ratio, cursorPos[0] * 14 * 1.5 * pixel_ratio, args.length * 7 * pixel_ratio, 14 * 1.5 * pixel_ratio)
+                ctx.fillRect(cursorPos[1] * (fontSize / 2) * pixel_ratio, cursorPos[0] * fontSize * lineHeight * pixel_ratio, args.length * (fontSize / 2) * pixel_ratio, fontSize * lineHeight * pixel_ratio)
             }
 
-            ctx.font = (14 * pixel_ratio) + "px InconsolataforPowerline Nerd Font"
+            ctx.font = (fontSize * pixel_ratio) + "px InconsolataforPowerline Nerd Font"
             if (this.state.editor.highlight.foreground != undefined) {
                 ctx.fillStyle = this.state.editor.highlight.foreground;
             } else {
                 ctx.fillStyle = this.state.editor.fg;
             }
             if (text.trim()) {
-              ctx.fillText(text, cursorPos[1] * 7 * pixel_ratio, (cursorPos[0] + 1) * 14 * 1.5 * pixel_ratio - (6 * pixel_ratio))
+                if (ctx.measureText(text).width != ctx.measureText("a").width * text.length) {
+                    text.split("").forEach((char, i) => {
+                        ctx.fillText(char, (cursorPos[1] + i) * (fontSize / 2) * pixel_ratio, (cursorPos[0] + 1) * fontSize * lineHeight * pixel_ratio - ((fontSize * (lineHeight - 1) / 2 + 2.5) * pixel_ratio))
+                    })
+                } else {
+                    ctx.fillText(text, cursorPos[1] * (fontSize / 2) * pixel_ratio, (cursorPos[0] + 1) * fontSize * lineHeight * pixel_ratio - ((fontSize * (lineHeight - 1) / 2 + 2.5) * pixel_ratio))
+                }
             }
             // console.log("ctx filltext", wincanvasId, text, cursorPos[1] * 7, (cursorPos[0] + 1) * 14)
             // ctx.fillText(text, 0, 14)
@@ -847,6 +867,11 @@ class Editor {
         var count = arg[1]
         var wins = this.state.editor.wins
         var win = wins.get(winId)
+        var fontSize = this.state.editor.fontSize
+        var lineHeight = this.state.editor.lineHeight
+        if (win.get("floating")) {
+            lineHeight = this.state.editor.floatingLineHeight
+        }
         var height = win.get("height")
         if (height == undefined) {
             height = 0
@@ -870,10 +895,10 @@ class Editor {
         var c = document.getElementById(wincanvasId)
         if (c != undefined) {
             var ctx = c.getContext("2d")
-            var width = win.get("width") * 7 * pixel_ratio
-            var height = height * 14 * 1.5 * pixel_ratio
-            var startY = startRow * 14 * 1.5 * pixel_ratio
-            var destY = destRow * 14 * 1.5 * pixel_ratio
+            var width = win.get("width") * (fontSize / 2) * pixel_ratio
+            var height = height * fontSize * lineHeight * pixel_ratio
+            var startY = startRow * fontSize * lineHeight * pixel_ratio
+            var destY = destRow * fontSize * lineHeight * pixel_ratio
 
             var buffer = document.createElement('canvas');
             buffer.width = width
@@ -885,7 +910,7 @@ class Editor {
                 0, width, height
             );
 
-            ctx.clearRect(0, 0, width, win.get("height") * 14 * 1.5 * pixel_ratio)
+            ctx.clearRect(0, 0, width, win.get("height") * fontSize * lineHeight * pixel_ratio)
             ctx.drawImage(buffer,
                 0, destY, width, height)
 
@@ -893,7 +918,7 @@ class Editor {
             const captured = ctx.getImageData(
                 0, startY, width, height
             )
-            ctx.clearRect(0, 0, width, win.get("height") * 14 * 1.5 * pixel_ratio)
+            ctx.clearRect(0, 0, width, win.get("height") * fontSize * lineHeight * pixel_ratio)
             ctx.putImageData(
                 captured, 0, destY
             );
@@ -976,13 +1001,18 @@ class Editor {
         var arg = args[0]
         console.log("win_clear", arg)
         var wins = this.state.editor.wins
+        var fontSize = this.state.editor.fontSize
         arg.forEach((winId, i) => {
             var wincanvasId = "wincanvas" + winId
             var c = document.getElementById(wincanvasId)
+            var lineHeight = this.state.editor.lineHeight
             var win = wins.get(winId)
+            if (win.get("floating")) {
+                lineHeight = this.state.editor.floatingLineHeight
+            }
             if (c != undefined) {
                 var ctx = c.getContext("2d")
-                ctx.clearRect(0, 0, win.get("width") * 7 * pixel_ratio, (win.get("height") + 1) * 14 * 1.5 * pixel_ratio)
+                ctx.clearRect(0, 0, win.get("width") * (fontSize / 2) * pixel_ratio, (win.get("height") + 1) * fontSize * lineHeight * pixel_ratio)
             }
         })
         // this.state.editor.activeWins = arg
@@ -1046,48 +1076,8 @@ class Editor {
         // console.log("activeWins in win_resize", this.state.editor.activeWins)
     }
 
-    canvas_update(winId, oldWidth, oldHeight, width, height) {
-        if (oldWidth != undefined && oldHeight != undefined) {
-            return
-        } else {
-            var width = this.state.editor.width
-            var height = this.state.editor.height
-            var wincanvasId = "wincanvas" + winId
-            var c = document.getElementById(wincanvasId)
-            if (c != undefined) {
-                c.width = width * 7 * pixel_ratio
-                c.height = (height + 1) * 14 * 1.5 * pixel_ratio
-                c.style.width = (c.width / pixel_ratio) + 'px'
-                c.style.height = (c.height / pixel_ratio) + 'px'
-            }
-            return
-        }
-
-        if (oldWidth == width && oldHeight == height) {
-            return
-        }
-
-        console.log("now update canvas", oldWidth, oldHeight, width, height)
-        var wincanvasId = "wincanvas" + winId
-        var c = document.getElementById(wincanvasId)
-        if (c != undefined) {
-            var ctx = c.getContext("2d")
-            var captured
-            if (oldWidth != undefined && oldHeight != undefined) {
-                captured = ctx.getImageData(0, 0, oldWidth * 7 * pixel_ratio, (oldHeight + 1) * 14 * 1.5 * pixel_ratio)
-            }
-            c.width = width * 7 * pixel_ratio
-            c.height = (height + 1) * 14 * 1.5 * pixel_ratio
-            c.style.width = (c.width / pixel_ratio) + 'px'
-            c.style.height = (c.height / pixel_ratio) + 'px'
-            if (captured != undefined) {
-                ctx.clearRect(0, 0, oldWidth * 7 * pixel_ratio, (oldHeight + 1) * 14 * 1.5 * pixel_ratio)
-                ctx.putImageData(captured, 0, 0)
-            }
-        }
-    }
-
     win_update(args) {
+        return
         var arg = args[0];
         var need_update = false;
         var wins = this.state.editor.wins
@@ -1132,7 +1122,6 @@ class Editor {
                 need_update = true;
             }
         }
-        this.canvas_update(winId, oldWidth, oldHeight, width, height)
         if (need_update) {
             wins = wins.set(winId, win)
             this.state.editor.wins = wins
