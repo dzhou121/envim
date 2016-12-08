@@ -23,7 +23,14 @@ class Tab extends Component {
             if (active == item[0]) {
                 className = className + " activetab"
             }
-            var tabText = item[1].slice(0, 30)
+            var txt = item[1]
+            var tabText
+            if (txt.startsWith("term://")) {
+                tabText = txt
+            } else {
+                var tabs = item[1].split("/")
+                tabText = tabs[tabs.length - 1]
+            }
             spans.push(<li key={i} className={className}>{tabText}</li>)
         })
 
