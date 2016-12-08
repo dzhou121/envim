@@ -774,7 +774,8 @@ class Editor {
             //                 ctx.backingStorePixelRatio || 1
             // console.log("backingStoreRatio is", backingStoreRatio)
             var text = (args.map(arg => {return arg[1]})).join("")
-            ctx.clearRect(cursorPos[1] * (fontSize / 2) * pixel_ratio, cursorPos[0] * fontSize * lineHeight * pixel_ratio, args.length * (fontSize / 2) * pixel_ratio, fontSize * lineHeight * pixel_ratio)
+            var drawWidth = ctx.measureText(text).width
+            ctx.clearRect(cursorPos[1] * (fontSize / 2) * pixel_ratio, cursorPos[0] * fontSize * lineHeight * pixel_ratio, drawWidth, fontSize * lineHeight * pixel_ratio)
             if (this.state.editor.highlight.background != undefined) {
                 ctx.fillStyle = this.state.editor.highlight.background;
                 ctx.fillRect(cursorPos[1] * (fontSize / 2) * pixel_ratio, cursorPos[0] * fontSize * lineHeight * pixel_ratio, args.length * (fontSize / 2) * pixel_ratio, fontSize * lineHeight * pixel_ratio)
@@ -787,7 +788,7 @@ class Editor {
                 ctx.fillStyle = this.state.editor.fg;
             }
             if (text.trim()) {
-                if (ctx.measureText(text).width != ctx.measureText("a").width * text.length) {
+                if (drawWidth != ctx.measureText("a").width * text.length) {
                     text.split("").forEach((char, i) => {
                         ctx.fillText(char, (cursorPos[1] + i) * (fontSize / 2) * pixel_ratio, (cursorPos[0] + 1) * fontSize * lineHeight * pixel_ratio - ((fontSize * (lineHeight - 1) / 2 + 2.5) * pixel_ratio))
                     })

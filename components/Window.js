@@ -76,7 +76,7 @@ class Window extends Component {
             style.left = (editor.width - 100) * (fontSize / 2) / 2
             style.top = 0
             style.border = "1px solid #000000"
-            style.boxShadow = "0 0 10px #000"
+            style.boxShadow = "0px 2px 8px #000"
             style.backgroundColor = "#15191b"
             if (win.get("preview") && !cursor) {
                 style.left = editorCursorPos[1] * (fontSize / 2)

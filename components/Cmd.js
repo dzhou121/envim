@@ -32,14 +32,18 @@ export default class Cmd extends Component {
             text = " "
         }
 
+        var padding = 16
+        var cmdmenuHtml
         var menuHtml = []
         wildmenu.forEach((item, i) => {
             var preStyle = {
                 lineHeight: 2,
             }
             var innerstyle = {
-                backgroundColor: "#0e1112",
+                backgroundColor: "#15191b",
                 color: "#cdd3de",
+                paddingLeft: padding,
+                paddingRight: padding,
             }
             if (i == wildmenuMatch) {
                 innerstyle.backgroundColor = "#519aba"
@@ -47,15 +51,23 @@ export default class Cmd extends Component {
             menuHtml.push(<pre style={preStyle}><span style={innerstyle}>{item}</span></pre>)
         })
 
+        if (menuHtml.length > 0) {
+            var cmdmenuStyle = {
+                paddingBottom: padding / 2,
+            }
+            cmdmenuHtml = <div style={cmdmenuStyle} className="cmdmenu">{menuHtml}</div>
+        }
+
         var chars = 70
-        var width = 7 * chars
-        var padding = 21
+        var width = 7 * chars + padding * 2
         var style = {
             zIndex: 1000,
             position: "absolute",
-            backgroundColor: "#0e1112",
+            backgroundColor: "#15191b",
+            border: "1px solid #000",
+            // backgroundColor: "#252526",
             color: "#cdd3de",
-            padding: padding,
+            boxShadow: "0px 2px 8px #000",
             width: width,
             left: (editor.width * 7 - width) / 2,
         }
@@ -78,12 +90,24 @@ export default class Cmd extends Component {
         trunks.forEach((trunk, i) => {
             spansHtml.push(<span key={i} style={spanStyle}>{trunk}</span>)
         })
-        var top = parseInt(pos / chars) + 1
+        var top = parseInt(pos / chars)
         var left = pos % chars
-        return <div style={style}>
-            <Cursor padding={padding} top={top} left={left} editor={editor} mode={"insert"} />
-            <pre>{spansHtml}</pre>
-            {menuHtml}
+        var cmdlineStyle = {
+            padding: padding / 2,
+        }
+        var cmdlineInnerStyle = {
+            backgroundColor: "#252526",
+            // backgroundColor: "#3c3c3c",
+            paddingLeft: padding / 2,
+            paddingRight: padding / 2,
+            lineHeight: 2,
+        }
+        return <div className="cmd" style={style}>
+            <Cursor lengthShift={10} padding={padding} top={top} left={left} editor={editor} mode={"insert"} lineHeight={2} paddingTop={padding / 2} />
+            <div style={cmdlineStyle} className="cmdline">
+                <pre style={cmdlineInnerStyle}>{spansHtml}</pre>
+            </div>
+            {cmdmenuHtml}
             </div>
     }
 }
