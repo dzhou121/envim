@@ -103,7 +103,7 @@ export default class Cmd extends Component {
             lineHeight: 2,
         }
         return <div className="cmd" style={style}>
-            <Cursor lengthShift={10} padding={padding} top={top} left={left} editor={editor} mode={"insert"} lineHeight={2} paddingTop={padding / 2} />
+            <Cursor lengthShift={10} padding={-padding} top={top} left={left} editor={editor} mode={"insert"} lineHeight={2} paddingTop={padding / 2} />
             <div style={cmdlineStyle} className="cmdline">
                 <pre style={cmdlineInnerStyle}>{spansHtml}</pre>
             </div>

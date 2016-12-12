@@ -16,6 +16,29 @@
         .tab::after { content: ''; position: absolute; width: 10%; height: 2px; z-index: 999; bottom: 0px; left: 45%; opacity: 0; }
         .activetab::after { width: 100%; left: 0px; opacity: 1; background: #519aba;}
         .linter ::before {content: ''; position: absolute; top: -8px; left:0; border: 8px solid; border-color: transparent transparent #d4d7d6 #d4d7d6}
+        .statusline span {
+        font-family: -apple-system,BlinkMacSystemFont,Segoe WPC,Segoe UI,HelveticaNeue-Light,Ubuntu,Droid Sans,sans-serif;
+        font-size: 12px;
+        margin-left: 6px;
+        float: left;
+}
+        .statusline span.right {
+            margin-right: 6px;
+            float: right;
+        }
+        .statusline {
+            vertical-align: middle;
+            display: table-cell;
+        background-color: #1f2326;
+        color: #d4d7d6;
+        }
+        .statusline .git {
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M27.459 14.902L17.02 4.463a1.517 1.517 0 0 0-1.089-.452c-.417 0-.793.157-1.089.452L12.594 6.71l2.549 2.549c.249-.112.522-.177.813-.177 1.106 0 2.002.896 2.002 2.002 0 .291-.064.565-.176.814l2.311 2.336c.25-.111.633-.234.923-.234 1.106 0 2 .911 2 2.016s-.894 1.969-2 1.969C19.911 17.984 19 17.234 19 16c0-.28.016-.462.119-.704l-2.373-2.374-.023.007v6.274A2.02 2.02 0 0 1 18 21.078c0 1.105-.878 2.016-1.984 2.016a2.053 2.053 0 0 1-2.031-2.031c0-.846.535-1.564 1.28-1.857l.001-6.25a1.996 1.996 0 0 1-1.147-2.659L11.564 7.74l-7.115 7.114a1.542 1.542 0 0 0 .001 2.178L14.89 27.55c.296.295.671.45 1.089.45.415 0 .796-.159 1.089-.45l10.391-10.471a1.541 1.541 0 0 0 0-2.177z' fill='%23fff'/%3E%3C/svg%3E");
+            background-position: 0px 50%;
+            background-repeat: no-repeat;
+            padding-left: 17px;
+            background-size: 17px;
+        }
     </style>
   </head>
   <body>

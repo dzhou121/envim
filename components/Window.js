@@ -32,11 +32,11 @@ class Window extends Component {
     }
 
     shouldComponentUpdate(nextProps, nextState) {
-        return (nextProps.win != this.props.win) || (this.props.cursor != nextProps.cursor) || (this.props.popupmenu != nextProps.popupmenu) || (this.props.popupmenuShow != nextProps.popupmenuShow) || (nextProps.display != this.props.display) || (this.props.win.get("floating"))
+        return (nextProps.win != this.props.win)  || (this.props.popupmenu != nextProps.popupmenu) || (this.props.popupmenuShow != nextProps.popupmenuShow) || (nextProps.display != this.props.display) || (this.props.win.get("floating"))
     }
 
     render() {
-        const { display, win, bg, fg, editor, cursor, popupmenuShow, popupmenu } = this.props
+        const { display, win, bg, fg, editor, popupmenuShow, popupmenu } = this.props
         var lineHeight = editor.lineHeight
         if (win.get("floating")) {
             lineHeight = editor.floatingLineHeight
@@ -70,6 +70,14 @@ class Window extends Component {
             padding = 3
         }
 
+        var paddingTop = 0
+        if (pos[0] > 0) {
+            style.borderTop = "1px solid #181d22"
+            // paddingTop = fontSize * lineHeight
+            // style.paddingTop = fontSize * lineHeight
+            style.top = pos[0] * fontSize * lineHeight - 1
+        }
+
         if (win.get("floating")){
             var editorCursorPos = editor.cursorPos
             style.zIndex = 500
@@ -78,30 +86,12 @@ class Window extends Component {
             style.border = "1px solid #000000"
             style.boxShadow = "0px 2px 8px #000"
             style.backgroundColor = "#15191b"
-            if (win.get("preview") && !cursor) {
+            if (win.get("preview") && win.get("id") != editor.curWin) {
                 style.left = editorCursorPos[1] * (fontSize / 2)
-                style.top = (editorCursorPos[0] + 1) * fontSize * lineHeight
+                style.top = (editorCursorPos[0] + 1) * fontSize * editor.lineHeight
             }
         }
 
-        var cursorHtml
-        var cursorMsgHtml
-        if (cursor) {
-            var pos = win.get("cursorPos")
-            cursorHtml = <Cursor key={"cursor"} padding={padding} left={pos[1]} top={pos[0]} editor={editor} mode={editor.mode} lineHeight={lineHeight} />
-            if (editor.cursormsg) {
-                var cursorMsgStyle = {
-                    position: "absolute",
-                    left: pos[1] * (fontSize / 2) + padding,
-                    top: (pos[0] + 1) * fontSize * lineHeight + 4,
-                    fontSize: 12,
-                    padding: "4px 6px 4px 6px",
-                    backgroundColor: "#d4d7d6",
-                    color: "#0e1112",
-                }
-                cursorMsgHtml = <div className="linter" style={cursorMsgStyle}><span>{editor.cursormsg}</span></div>
-            }
-        }
         var popupmenuHtml
         if (popupmenuShow) {
             popupmenuHtml = <Popupmenu key={"popupmenu"} menu={popupmenu} />
@@ -121,8 +111,6 @@ class Window extends Component {
         //<canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} width={win.get("width") * (fontSize / 2)} height={(win.get("height") + 1) * 14 * 1.5} />
         return <div id={"windiv" + win.get("id")} style={style}>
             {popupmenuHtml}
-            {cursorHtml}
-            {cursorMsgHtml}
             <canvas ref={"wincanvas" + win.get("id")} id={"wincanvas" + win.get("id")} style={canvasStyle} width={canvasBaseWidth * (fontSize / 2) * editor.pixel_ratio} height={(canvasBaseHeight + 1) * fontSize * lineHeight * editor.pixel_ratio} />
             </div>
     }

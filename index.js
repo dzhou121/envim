@@ -14,6 +14,7 @@ import Popupmenu from './components/Popupmenu'
 import Emsg from './components/Emsg'
 import Msg from './components/Msg'
 import Tab from './components/Tab'
+import StatusLine from './components/Statusline'
 
 var uniqueId = 0
 
@@ -35,7 +36,7 @@ var editor = {
     lineHeight: 1.5,
     floatingLineHeight: 2,
     fontSize: 14,
-    statusLine: true,
+    statusLine: "",
     cmdheight: 1,
     cursorPos: [0, 0],
     cursorWin: 0,
@@ -52,13 +53,17 @@ var editor = {
     }),
     popupmenuWin: 1,
     previewWin: 0,
+    curWin: 0,
 }
 
 const ThisBrowserWindow = remote.getCurrentWindow();
-console.log("BrowserWindow's size", ThisBrowserWindow.getContentSize())
 var size = ThisBrowserWindow.getContentSize()
 editor.width = Math.round(size[0] / (editor.fontSize / 2), 0)
-editor.height = Math.round((size[1] - 34) / (editor.fontSize * editor.lineHeight)) + 1
+editor.height = Math.round((size[1] - 30) / (editor.fontSize * editor.lineHeight))
+editor.statusLineHeight = size[1] - 30 - ((editor.height - 1) * editor.fontSize * editor.lineHeight)
+console.log("BrowserWindow's size", size)
+console.log("editor height is", editor.height)
+console.log("editor status height is", editor.statusLineHeight)
 const pixel_ratio = window.devicePixelRatio || 1
 editor.pixel_ratio = pixel_ratio
 console.log("pixel ratio is", pixel_ratio)
@@ -120,25 +125,51 @@ var EnvimEditor = React.createClass({
                 }
                 // var winPos = win.get("pos")
                 // var winEnd = win.get("end")
-                var cursor = false
                 var popupmenuShow = false
-                if (i == editor.cursorWin) {
-                    cursor = true
+                if (i == editor.curWin) {
                     var winCursorPos = win.get("cursorPos")
-                    editor.cursorPos = [win.get("row") + winCursorPos[0], win.get("col") + winCursorPos[1]]
+                    if (winCursorPos != undefined) {
+                        editor.cursorPos = [win.get("row") + winCursorPos[0], win.get("col") + winCursorPos[1]]
+                    }
                 }
                 if (i == editor.popupmenuWin) {
                     popupmenuShow = true
                 }
-                // if (pos[0] >= winPos.get(0) && pos[0] <= winEnd.get(0) && pos[1] >= winPos.get(1) && pos[1] <= winEnd.get(1)) {
-                //     cursor = true
-                // }
-                // if (win.get("cmd")) {
-                //     winsElement.push(<Cmd key={i} win={win} bg={editor.bg} fg={editor.fg} editor={editor} cursor={cursor} />)
-                // } else {
-                    winsElement.push(<Window display={display} key={i} win={win} bg={editor.bg} fg={editor.fg} editor={editor} cursor={cursor} popupmenuShow={popupmenuShow} popupmenu={editor.popupmenu} />)
-                // }
+                winsElement.push(<Window display={display} key={i} win={win} bg={editor.bg} fg={editor.fg} editor={editor} popupmenuShow={popupmenuShow} popupmenu={editor.popupmenu} />)
             })
+        }
+        var cursorHtml
+        var cursorMsgHtml
+        if (wins.get(editor.curWin)) {
+            var win = wins.get(editor.curWin)
+            var pos = win.get("cursorPos")
+            if (pos != undefined) {
+                var left = pos[1] + win.get("col")
+                var top = pos[0] + win.get("row")
+                var padding = 0
+                if (win.get("col") > 0) {
+                    padding = 3
+                }
+                var lineHeight = 1.5
+                var paddingTop = 0
+                if (win.get("floating")){
+                    padding = - ((editor.width - 100) * (fontSize / 2) / 2 + 1)
+                    lineHeight = 2
+                }
+                cursorHtml = <Cursor key={"cursor"} padding={padding} left={left} top={top} editor={editor} mode={editor.mode} lineHeight={lineHeight} paddingTop={paddingTop} />
+                if (editor.cursormsg) {
+                    var cursorMsgStyle = {
+                        position: "absolute",
+                        left: pos[1] + win.get("col") * (fontSize / 2) + padding,
+                        top: (pos[0] + 1) + win.get("row") * fontSize * lineHeight + 4,
+                        fontSize: 12,
+                        padding: "4px 6px 4px 6px",
+                        backgroundColor: "#d4d7d6",
+                        color: "#0e1112",
+                    }
+                    cursorMsgHtml = <div className="linter" style={cursorMsgStyle}><span>{editor.cursormsg}</span></div>
+                }
+            }
         }
 
         var style = {
@@ -153,6 +184,7 @@ var EnvimEditor = React.createClass({
             top: 0,
             zIndex: 1000,
         }
+        console.log("statusline is", editor.statusLine)
 
         return (
             <div>
@@ -160,11 +192,14 @@ var EnvimEditor = React.createClass({
                 <div style={style}>
                 {cmdHtml}
                 {winsElement}
+                {cursorHtml}
+                {cursorMsgHtml}
                 <div style={msgStyle}>
                   {emsgHtml}
                   {msgHtml}
                 </div>
                 </div>
+                <StatusLine editor={editor} text={editor.statusLine} width={size[0]} />
             </div>
         )
     }
@@ -317,6 +352,10 @@ class Editor {
                 case 'win_put':
                     // console.log("win_put")
                     this.win_put(arg.slice(1))
+                    break
+                case 'win_status_line':
+                    // console.log("win_put")
+                    this.win_status_line(arg.slice(1))
                     break
                 case 'win_cursor_goto':
                     // console.log("win_cursor_goto")
@@ -732,6 +771,17 @@ class Editor {
         this.state.editor.wins = wins.set(winId, win)
     }
 
+    win_status_line(args) {
+        var editor = this.state.editor
+        var arg = args[0]
+        var winId = arg[0]
+        var statusLine = arg[1]
+
+        if (winId == editor.curWin) {
+            editor.statusLine = statusLine
+        }
+    }
+
     win_put(args) {
         var arg = args[0]
         var winId = arg[0]
@@ -765,7 +815,7 @@ class Editor {
 
         var wincanvasId = "wincanvas" + winId
         var c = document.getElementById(wincanvasId)
-        if (c != undefined) {
+        if (c != undefined && cursorPos[0] < height) {
             var ctx = c.getContext("2d")
             // var backingStoreRatio = ctx.webkitBackingStorePixelRatio ||
             //                 ctx.mozBackingStorePixelRatio ||
@@ -1039,8 +1089,12 @@ class Editor {
             var col = winArg[4]
             var floating = winArg[5]
             var preview = winArg[6]
+            var curWin = winArg[7]
             if (floating) {
                 editor.previewWin = winId
+            }
+            if (curWin) {
+                editor.curWin = winId
             }
             var win = wins.get(winId)
             if (win === undefined) {

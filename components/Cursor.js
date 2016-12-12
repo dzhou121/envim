@@ -26,7 +26,7 @@ class Cursor extends Component {
             width: fontSize / 2 - 0.5,
             height: fontSize * lineHeight - lengthShift,
             position: "absolute",
-            left: left * fontSize / 2 + padding,
+            left: left * fontSize / 2 - padding,
             zIndex: 1300,
         }
         if (top != undefined) {
