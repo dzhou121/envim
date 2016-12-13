@@ -27,7 +27,7 @@ app.on('window-all-closed', () => {
 app.on('ready', () => {
     const menu = Menu.buildFromTemplate(template)
     Menu.setApplicationMenu(menu)
-    mainWindow = new BrowserWindow({width: 366 * 7, height: 63 * 14 * 1.5 + 35});
+    mainWindow = new BrowserWindow({width: 366 * 7, height: 64 * 14 * 1.5 + 35});
     mainWindow.webContents.openDevTools()
     console.log(mainWindow.width, mainWindow.height)
 

@@ -14,7 +14,7 @@ export default class StatusLine extends Component {
         const { editor, text, width } = this.props
 
         var statusLineStyle = {
-            height: editor.statusLineHeight,
+            height: editor.statusLineHeight - 2,
             width: width, 
         }
 
@@ -70,27 +70,26 @@ export default class StatusLine extends Component {
             spans.push(span)
         }
 
-        var per = parts[7]
-        if (per) {
-            var span = <span className={"right"} key={"per"}>{per}%</span>
-            spans.push(span)
-        }
-
-
-        var col = parts[6]
-        if (col) {
-            var span = <span className={"right"} key={"col"}>C: {col}</span>
-            spans.push(span)
-        }
-
         var line = parts[5]
-        if (line) {
-            var span = <span className={"right"} key={"line"}>L: {line}</span>
+        var col = parts[6]
+        var per = parts[7]
+        if (per || line || col) {
+            var pos = ""
+            if (line) {
+                pos = "L: " + line
+            }
+            if (col) {
+                pos = pos + " C: " + col
+            }
+            if (per) {
+                pos = pos + " " + per + "%"
+            }
+            var span = <span className={"right"} key={"pos"}>{pos}</span>
             spans.push(span)
         }
 
         if (ale) {
-            console.log("ale is", ale)
+            // console.log("ale is", ale)
             var style = {
             }
             var error = ""
@@ -109,10 +108,16 @@ export default class StatusLine extends Component {
                 warning = ale.slice(1)
             }
             if (error) {
-                error = "x " + error
+                var style = {
+                    color: "#ec5f67",
+                }
+                error = <span style={style}>{"x " + error}</span>
             }
             if (warning) {
-                warning = "! " + warning
+                var style = {
+                    color: "#fac863",
+                }
+                warning = <span style={style}>{"! " + warning}</span>
             }
             var span = <span style={style} className={"right"} key={"ale"}>{error} {warning} {ok}</span>
             spans.push(span)

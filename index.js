@@ -58,9 +58,10 @@ var editor = {
 
 const ThisBrowserWindow = remote.getCurrentWindow();
 var size = ThisBrowserWindow.getContentSize()
+editor.tabHeight = 26
 editor.width = Math.round(size[0] / (editor.fontSize / 2), 0)
-editor.height = Math.round((size[1] - 30) / (editor.fontSize * editor.lineHeight))
-editor.statusLineHeight = size[1] - 30 - ((editor.height - 1) * editor.fontSize * editor.lineHeight)
+editor.height = Math.round((size[1] - editor.tabHeight) / (editor.fontSize * editor.lineHeight))
+editor.statusLineHeight = size[1] - editor.tabHeight - ((editor.height - 1) * editor.fontSize * editor.lineHeight)
 console.log("BrowserWindow's size", size)
 console.log("editor height is", editor.height)
 console.log("editor status height is", editor.statusLineHeight)
@@ -113,7 +114,7 @@ var EnvimEditor = React.createClass({
 
         var tabHtml
         if (tab.length > 0) {
-            tabHtml = <Tab tab={tab} />
+            tabHtml = <Tab editor={editor} tab={tab} />
         }
 
         if (wins !== undefined) {
@@ -160,12 +161,13 @@ var EnvimEditor = React.createClass({
                 if (editor.cursormsg) {
                     var cursorMsgStyle = {
                         position: "absolute",
-                        left: pos[1] + win.get("col") * (fontSize / 2) + padding,
-                        top: (pos[0] + 1) + win.get("row") * fontSize * lineHeight + 4,
+                        left: (pos[1] + win.get("col")) * (fontSize / 2) - padding,
+                        top: ((pos[0] + 1) + win.get("row")) * fontSize * lineHeight + 4,
                         fontSize: 12,
                         padding: "4px 6px 4px 6px",
                         backgroundColor: "#d4d7d6",
                         color: "#0e1112",
+                        zIndex: 1300,
                     }
                     cursorMsgHtml = <div className="linter" style={cursorMsgStyle}><span>{editor.cursormsg}</span></div>
                 }
@@ -173,7 +175,7 @@ var EnvimEditor = React.createClass({
         }
 
         var style = {
-            height: (editor.height - 1) * fontSize * lineHeight,
+            height: (editor.height - 1) * fontSize * editor.lineHeight,
             backgroundColor: editor.bg,
             position: "relative",
         }
@@ -184,7 +186,7 @@ var EnvimEditor = React.createClass({
             top: 0,
             zIndex: 1000,
         }
-        console.log("statusline is", editor.statusLine)
+        // console.log("statusline is", editor.statusLine)
 
         return (
             <div>
@@ -1035,7 +1037,7 @@ class Editor {
     }
 
     win_close(args) {
-        console.log("win_close")
+        // console.log("win_close")
         var arg = args[0]
         var winId = arg[0]
         var wins = this.state.editor.wins
@@ -1050,7 +1052,7 @@ class Editor {
 
     win_clear(args) {
         var arg = args[0]
-        console.log("win_clear", arg)
+        // console.log("win_clear", arg)
         var wins = this.state.editor.wins
         var fontSize = this.state.editor.fontSize
         arg.forEach((winId, i) => {
