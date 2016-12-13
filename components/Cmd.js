@@ -65,6 +65,7 @@ export default class Cmd extends Component {
             position: "absolute",
             backgroundColor: "#15191b",
             border: "1px solid #000",
+            borderTop: "none",
             // backgroundColor: "#252526",
             color: "#cdd3de",
             boxShadow: "0px 2px 8px #000",
