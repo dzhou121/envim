@@ -26,6 +26,9 @@ export default class StatusLine extends Component {
         }
 
         var parts = text.split(",")
+        if (parts.length < 11) {
+            parts = []
+        }
         var spans = []
         var ro = parts[8]
         var modified = parts[9]

@@ -48,7 +48,7 @@ export default class Cmd extends Component {
             if (i == wildmenuMatch) {
                 innerstyle.backgroundColor = "#519aba"
             }
-            menuHtml.push(<pre style={preStyle}><span style={innerstyle}>{item}</span></pre>)
+            menuHtml.push(<pre key={i} style={preStyle}><span style={innerstyle}>{item}</span></pre>)
         })
 
         if (menuHtml.length > 0) {

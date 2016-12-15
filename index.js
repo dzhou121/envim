@@ -34,7 +34,7 @@ var editor = {
     height: 63,
     mode: "normal",
     lineHeight: 1.5,
-    floatingLineHeight: 2,
+    floatingLineHeight: 1.8,
     fontSize: 14,
     statusLine: "",
     cmdheight: 1,
@@ -58,7 +58,7 @@ var editor = {
 
 const ThisBrowserWindow = remote.getCurrentWindow();
 var size = ThisBrowserWindow.getContentSize()
-editor.tabHeight = 26
+editor.tabHeight = 30
 editor.width = Math.round(size[0] / (editor.fontSize / 2), 0)
 editor.height = Math.round((size[1] - editor.tabHeight) / (editor.fontSize * editor.lineHeight))
 editor.statusLineHeight = size[1] - editor.tabHeight - ((editor.height - 1) * editor.fontSize * editor.lineHeight)
@@ -151,11 +151,10 @@ var EnvimEditor = React.createClass({
                 if (win.get("col") > 0) {
                     padding = 3
                 }
-                var lineHeight = 1.5
                 var paddingTop = 0
                 if (win.get("floating")){
                     padding = - ((editor.width - 100) * (fontSize / 2) / 2 + 1)
-                    lineHeight = 2
+                    lineHeight = editor.floatingLineHeight
                 }
                 cursorHtml = <Cursor key={"cursor"} padding={padding} left={left} top={top} editor={editor} mode={editor.mode} lineHeight={lineHeight} paddingTop={paddingTop} />
                 if (editor.cursormsg) {
@@ -163,7 +162,6 @@ var EnvimEditor = React.createClass({
                         position: "absolute",
                         left: (pos[1] + win.get("col")) * (fontSize / 2) - padding,
                         top: ((pos[0] + 1) + win.get("row")) * fontSize * lineHeight + 4,
-                        fontSize: 12,
                         padding: "4px 6px 4px 6px",
                         backgroundColor: "#d4d7d6",
                         color: "#0e1112",
