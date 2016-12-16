@@ -65,9 +65,8 @@ class Window extends Component {
         var padding = 0
         if (left > 0) {
             style.borderLeft = "1px solid #000000"
-            style.paddingLeft = 3
-            style.paddingRight = 3
-            padding = 3
+            style.paddingLeft = 6
+            padding = 6
         }
 
         var paddingTop = 0
@@ -86,11 +85,18 @@ class Window extends Component {
             style.border = "1px solid #000000"
             style.borderTop = "none"
             style.boxShadow = "0px 2px 8px #000"
-            style.backgroundColor = "#15191b"
+            style.backgroundColor = "#181d22"
             if (win.get("preview") && win.get("id") != editor.curWin) {
                 style.left = editorCursorPos[1] * (fontSize / 2)
                 style.top = (editorCursorPos[0] + 1) * fontSize * editor.lineHeight
             }
+        }
+
+        if (win.get("buftype") == "nofile") { 
+            style.backgroundColor = "#181d22"
+            // style.backgroundColor = "#1f2326"
+        } else if (win.get("buftype") == "quickfix" || win.get("buftype") == "help") {
+            style.backgroundColor = "#1f2326"
         }
 
         var popupmenuHtml

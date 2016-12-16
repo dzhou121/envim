@@ -56,18 +56,7 @@ var editor = {
     curWin: 0,
 }
 
-const ThisBrowserWindow = remote.getCurrentWindow();
-var size = ThisBrowserWindow.getContentSize()
-editor.tabHeight = 30
-editor.width = Math.round(size[0] / (editor.fontSize / 2), 0)
-editor.height = Math.round((size[1] - editor.tabHeight) / (editor.fontSize * editor.lineHeight))
-editor.statusLineHeight = size[1] - editor.tabHeight - ((editor.height - 1) * editor.fontSize * editor.lineHeight)
-console.log("BrowserWindow's size", size)
-console.log("editor height is", editor.height)
-console.log("editor status height is", editor.statusLineHeight)
-const pixel_ratio = window.devicePixelRatio || 1
-editor.pixel_ratio = pixel_ratio
-console.log("pixel ratio is", pixel_ratio)
+resize()
 
 var cmdPos = [editor.height - editor.cmdheight, 0]
 var cmdEnd = [editor.height, editor.width - 1]
@@ -149,7 +138,7 @@ var EnvimEditor = React.createClass({
                 var top = pos[0] + win.get("row")
                 var padding = 0
                 if (win.get("col") > 0) {
-                    padding = 3
+                    padding = 0 
                 }
                 var paddingTop = 0
                 if (win.get("floating")){
@@ -199,7 +188,7 @@ var EnvimEditor = React.createClass({
                   {msgHtml}
                 </div>
                 </div>
-                <StatusLine editor={editor} text={editor.statusLine} width={size[0]} />
+                <StatusLine editor={editor} text={editor.statusLine} width={editor.size[0]} />
             </div>
         )
     }
@@ -218,6 +207,9 @@ function initEditor() {
             // console.log(err, nvim)
             EnvimState.nvim = nvim
             uiAttach()
+            nvim.on('disconnect', function() {
+                ThisBrowserWindow.close()
+            })
 
             document.addEventListener('keydown', function(e) {
                 var key = e.key
@@ -243,7 +235,36 @@ function initEditor() {
                 // console.log("keydown",e, key)
                 nvim.input(key)
             })
+
+            window.addEventListener('resize', function() {
+                checkResize()
+            })
         })
+}
+
+var resizeTimeout
+
+function checkResize() {
+    clearTimeout(resizeTimeout)
+    resizeTimeout = setTimeout(function() {
+        resize()
+        var editor = EnvimState.editor
+        EnvimState.nvim.uiTryResize(editor.width, editor.height);
+    }, 1000)
+}
+
+function resize() {
+    var BrowserWindow = remote.getCurrentWindow()
+    var size = BrowserWindow.getContentSize()
+    console.log("resize to", size)
+    editor.size = size
+    editor.tabHeight = 30
+    editor.width = Math.round(size[0] / (editor.fontSize / 2), 0)
+    editor.height = Math.round((size[1] - editor.tabHeight) / (editor.fontSize * editor.lineHeight))
+    editor.statusLineHeight = size[1] - editor.tabHeight - ((editor.height - 1) * editor.fontSize * editor.lineHeight)
+    editor.pixel_ratio = window.devicePixelRatio || 1
+    editor.cmdPos = [editor.height - editor.cmdheight, 0]
+    editor.cmdEnd = [editor.height, editor.width - 1]
 }
 
 function uiAttach() {
@@ -789,6 +810,7 @@ class Editor {
         var char = arg[1]
         var wins = this.state.editor.wins
         var win = wins.get(winId)
+        var pixel_ratio = this.state.editor.pixel_ratio
         if (win === undefined) {
             win = Immutable.Map({
                 id: winId,
@@ -920,6 +942,7 @@ class Editor {
         var win = wins.get(winId)
         var fontSize = this.state.editor.fontSize
         var lineHeight = this.state.editor.lineHeight
+        var pixel_ratio = this.state.editor.pixel_ratio
         if (win.get("floating")) {
             lineHeight = this.state.editor.floatingLineHeight
         }
@@ -1053,6 +1076,7 @@ class Editor {
         // console.log("win_clear", arg)
         var wins = this.state.editor.wins
         var fontSize = this.state.editor.fontSize
+        var pixel_ratio = this.state.editor.pixel_ratio
         arg.forEach((winId, i) => {
             var wincanvasId = "wincanvas" + winId
             var c = document.getElementById(wincanvasId)
@@ -1090,6 +1114,7 @@ class Editor {
             var floating = winArg[5]
             var preview = winArg[6]
             var curWin = winArg[7]
+            var buftype = winArg[8]
             if (floating) {
                 editor.previewWin = winId
             }
@@ -1106,6 +1131,7 @@ class Editor {
                     col: col, 
                     floating: floating,
                     preview: preview,
+                    buftype: buftype,
                 })
             } else {
                 oldWidth = win.get("width")
@@ -1118,6 +1144,7 @@ class Editor {
                     col: col, 
                     floating: floating,
                     preview: preview,
+                    buftype: buftype,
                 }))
             }
             activeWins.push(winId)
