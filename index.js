@@ -208,7 +208,7 @@ function initEditor() {
             EnvimState.nvim = nvim
             uiAttach()
             nvim.on('disconnect', function() {
-                ThisBrowserWindow.close()
+                remote.getCurrentWindow().close()
             })
 
             document.addEventListener('keydown', function(e) {
@@ -327,12 +327,14 @@ class Editor {
                     this.highlightSet(arg.slice(1))
                     break
                 case 'eol_clear':
-                    break
                     this.eolClear(arg.slice(1))
                     break
                 case 'set_scroll_region':
                     break
                     this.setScrollRegion(arg.slice(1))
+                    break
+                case 'win_set_scroll_region':
+                    this.win_set_scroll_region(arg.slice(1))
                     break
                 case 'scroll':
                     console.log('scroll')
@@ -804,6 +806,9 @@ class Editor {
     }
 
     win_put(args) {
+        if (args.length == 0) {
+            return
+        }
         var arg = args[0]
         var winId = arg[0]
         // console.log("win_put", winId, args.map(arg => {return arg[1]}))
@@ -906,6 +911,7 @@ class Editor {
         // win = win.set("signColumn", signColumn)
         // win = win.set("numColumn", numColumn)
         win = win.set("cursorPos", [cursorPos[0], cursorPos[1] + args.length])
+        // console.log("win cursor pos after put", cursorPos[0], cursorPos[1] + args.length, (args.map(arg => {return arg[1]})).join(""))
         wins = wins.set(winId, win)
         this.state.editor.wins = wins
     }
@@ -938,7 +944,10 @@ class Editor {
         var arg = args[0]
         var winId = arg[0]
         var count = arg[1]
+        // console.log("scroll",  winId, count)
+        var editor = this.state.editor
         var wins = this.state.editor.wins
+        var scroll = editor.scroll
         var win = wins.get(winId)
         var fontSize = this.state.editor.fontSize
         var lineHeight = this.state.editor.lineHeight
@@ -955,14 +964,23 @@ class Editor {
             })
         }
 
-        var startRow = 0
-        var destRow = 0
+        // var startRow = 0
+        // var destRow = 0
+        // if (count > 0) {
+        //     startRow = count
+        //     height = height - count
+        // } else {
+        //     destRow = -count
+        //     height = height + count
+        // }
+        var startRow = scroll
+        var destRow = scroll
         if (count > 0) {
-            startRow = count
-            height = height - count
+            startRow = scroll + count
+            height = height - scroll - count
         } else {
-            destRow = -count
-            height = height + count
+            destRow = scroll - count
+            height = height - scroll + count
         }
 
         var wincanvasId = "wincanvas" + winId
@@ -984,7 +1002,7 @@ class Editor {
                 0, width, height
             );
 
-            ctx.clearRect(0, 0, width, win.get("height") * fontSize * lineHeight * pixel_ratio)
+            ctx.clearRect(0, scroll * fontSize * lineHeight * pixel_ratio, width, (win.get("height") - scroll) * fontSize * lineHeight * pixel_ratio)
             ctx.drawImage(buffer,
                 0, destY, width, height)
 
@@ -1277,14 +1295,21 @@ class Editor {
     }
 
     eolClear(args) {
+        var editor = this.state.editor
+        var curWin = editor.curWin
+        var wins = editor.wins
+        var win = wins.get(curWin)
+
+        var cursorPos = win.get("cursorPos")
+
         args = []
-        var cursorPos = this.state.editor.get("cursorPos")
-        var width = this.state.editor.get("width")
+        var width = win.get("width")
         for (var i = cursorPos[1]; i < width; i++) {
-            args.push([" "])
+            args.push([curWin, " "])
         }
+        // console.log("eolClear", curWin, width, cursorPos[0], cursorPos[1])
+        this.win_put(args)
         // this.state.editor = this.state.editor.set("highlight", {})
-        this.put(args, false)
     }
 
     decToHex(n) {
@@ -1296,10 +1321,16 @@ class Editor {
         return "#".concat(hex);
     }
 
+    win_set_scroll_region(args) {
+        // console.log("set scroll region")
+        // console.log(args[0])
+        this.state.editor.scroll = args[0]
+    }
+
     setScrollRegion(args) {
-        console.log("set scroll region")
-        console.log(args[0])
-        this.state.editor = this.state.editor.set("scroll", args[0])
+        // console.log("set scroll region")
+        // console.log(args[0])
+        // this.state.editor.scroll = args[0]
     }
 
     scroll(args) {

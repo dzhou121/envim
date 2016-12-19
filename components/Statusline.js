@@ -33,6 +33,7 @@ export default class StatusLine extends Component {
         var ro = parts[8]
         var modified = parts[9]
         var ale = parts[10]
+        var tag = parts[11]
 
         var mode = parts[0]
         if (modes[mode]) {
@@ -88,6 +89,11 @@ export default class StatusLine extends Component {
                 pos = pos + " " + per + "%"
             }
             var span = <span className={"right"} key={"pos"}>{pos}</span>
+            spans.push(span)
+        }
+
+        if (tag) {
+            var span = <span className={"right"} key={"tag"}>{tag}</span>
             spans.push(span)
         }
 
