@@ -8,7 +8,7 @@ class Cursor extends Component {
 
     render() {
         const { editor, left, top, padding, mode } = this.props
-        var { drawHeight, lineHeight, paddingTop, lengthShift } = this.props
+        var { drawHeight, paddingTop, lengthShift } = this.props
         if (paddingTop == undefined) {
             paddingTop = 0
         }
@@ -17,9 +17,6 @@ class Cursor extends Component {
         }
 
         var fontSize = editor.fontSize
-        if (lineHeight == undefined) {
-            lineHeight = editor.lineHeight
-        }
         if (drawHeight == undefined) {
             drawHeight = editor.drawHeight
         }

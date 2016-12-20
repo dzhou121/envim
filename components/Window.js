@@ -38,8 +38,11 @@ class Window extends Component {
     render() {
         const { display, win, bg, fg, editor, popupmenuShow, popupmenu } = this.props
         var lineHeight = editor.lineHeight
+        var drawHeight = editor.drawHeight
+        var drawWidth = editor.drawWidth
         if (win.get("floating")) {
             lineHeight = editor.floatingLineHeight
+            drawHeight = editor.floatingDrawHeight
         }
         var fontSize = editor.fontSize
         var pos = [win.get("row"), win.get("col")]
@@ -101,7 +104,7 @@ class Window extends Component {
 
         var popupmenuHtml
         if (popupmenuShow) {
-            popupmenuHtml = <Popupmenu key={"popupmenu"} menu={popupmenu} />
+            popupmenuHtml = <Popupmenu key={"popupmenu"} menu={popupmenu} editor={editor} floating={win.get("floating")} drawHeight={drawHeight} drawWidth={drawWidth} />
         }
 
         var canvasBaseWidth = editor.width

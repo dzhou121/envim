@@ -12,7 +12,7 @@ class Popupmenu extends Component {
     }
 
     render() {
-        const { menu } = this.props
+        const { menu, editor, floating, drawWidth, drawHeight } = this.props
         if (!menu.get("show")) {
             return <div></div>
         }
@@ -20,8 +20,11 @@ class Popupmenu extends Component {
         var style = {
             position: "absolute",
             zIndex: 100,
-            top: (pos[0] + 1) * 14 * 1.5,
-            left: (pos[1] + 1) * 7 - 4,
+            top: (pos[0] + 1) * drawHeight,
+            left: (pos[1] + 1) * drawWidth - 4,
+        }
+        if (floating) {
+            style.left = pos[1] * drawWidth - 2
         }
         var iconStyle = {
             backgroundColor: "#658d30",
@@ -31,7 +34,7 @@ class Popupmenu extends Component {
         var innerstyle = {
             backgroundColor: "#0e1112",
             color: "#cdd3de",
-            marginLeft: - 7 * 4 - 4,
+            marginLeft: - drawWidth * 4 - 4,
             boxShadow: "0px 2px 10px 0px #000",
         }
         var menuHtml = []
