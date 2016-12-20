@@ -48,6 +48,7 @@ export default class StatusLine extends Component {
 
         var branch = parts[1]
         if (branch) {
+            branch = branch.slice(branch.indexOf("(") + 1, branch.indexOf(")"))
             var span = <span className={"git"} key={"branch"}>{branch}</span>
             spans.push(span)
         }
