@@ -87,6 +87,7 @@ var EnvimEditor = React.createClass({
         var tab = editor.tab
         var fontSize = this.state.editor.fontSize
         var lineHeight = this.state.editor.lineHeight
+        var drawHeight = editor.drawHeight
 
         var cmdHtml
         if (editor.cmdlineShow) {
@@ -142,10 +143,11 @@ var EnvimEditor = React.createClass({
                 }
                 var paddingTop = 0
                 if (win.get("floating")){
-                    padding = - ((editor.width - 100) * (fontSize / 2) / 2 + 1)
+                    padding = - ((editor.width - 100) * (fontSize / 2) / 2 + 1.5)
                     lineHeight = editor.floatingLineHeight
+                    drawHeight = editor.floatingDrawHeight
                 }
-                cursorHtml = <Cursor key={"cursor"} padding={padding} left={left} top={top} editor={editor} mode={editor.mode} lineHeight={lineHeight} paddingTop={paddingTop} />
+                cursorHtml = <Cursor key={"cursor"} padding={padding} left={left} top={top} editor={editor} mode={editor.mode} drawHeight={drawHeight} paddingTop={paddingTop} />
                 if (editor.cursormsg) {
                     var cursorMsgStyle = {
                         position: "absolute",
@@ -291,6 +293,9 @@ function resize() {
     editor.height = Math.round((size[1] - editor.tabHeight) / (editor.fontSize * editor.lineHeight))
     editor.statusLineHeight = size[1] - editor.tabHeight - ((editor.height - 1) * editor.fontSize * editor.lineHeight)
     editor.pixel_ratio = window.devicePixelRatio || 1
+    editor.drawWidth = editor.fontSize / 2
+    editor.drawHeight = Math.round(editor.fontSize * editor.lineHeight, 0)
+    editor.floatingDrawHeight = Math.round(editor.fontSize * editor.floatingLineHeight, 0)
     editor.cmdPos = [editor.height - editor.cmdheight, 0]
     editor.cmdEnd = [editor.height, editor.width - 1]
 }
@@ -485,12 +490,15 @@ class Editor {
     }
 
     busy_start(args) {
+        // console.log("busy_start", args)
     }
 
     busy_stop(args) {
+        // console.log("busy_stop", args)
     }
 
     mouse_on(args) {
+        // console.log("mouse_on", args)
     }
 
     cursorGoto(args) {
@@ -839,6 +847,9 @@ class Editor {
         }
         var arg = args[0]
         var winId = arg[0]
+        var editor = this.state.editor
+        var drawWidth = editor.drawWidth * editor.pixel_ratio
+        var drawHeight = editor.drawHeight * editor.pixel_ratio
         // console.log("win_put", winId, args.map(arg => {return arg[1]}))
         var char = arg[1]
         var wins = this.state.editor.wins
@@ -855,6 +866,7 @@ class Editor {
         var lineHeight = this.state.editor.lineHeight
         if (win.get("floating")) {
             lineHeight = this.state.editor.floatingLineHeight
+            drawHeight = editor.floatingDrawHeight * editor.pixel_ratio
         }
         var cursorPos = win.get("cursorPos")
         if (cursorPos === undefined) {
@@ -879,11 +891,15 @@ class Editor {
             //                 ctx.backingStorePixelRatio || 1
             // console.log("backingStoreRatio is", backingStoreRatio)
             var text = (args.map(arg => {return arg[1]})).join("")
-            var drawWidth = ctx.measureText(text).width
-            ctx.clearRect(cursorPos[1] * (fontSize / 2) * pixel_ratio, cursorPos[0] * fontSize * lineHeight * pixel_ratio, drawWidth, fontSize * lineHeight * pixel_ratio)
+            var textDrawWidth = ctx.measureText(text).width
+            ctx.clearRect(
+                cursorPos[1] * drawWidth,
+                cursorPos[0] * drawHeight,
+                text.length * drawWidth,
+                drawHeight)
             if (this.state.editor.highlight.background != undefined) {
                 ctx.fillStyle = this.state.editor.highlight.background;
-                ctx.fillRect(cursorPos[1] * (fontSize / 2) * pixel_ratio, cursorPos[0] * fontSize * lineHeight * pixel_ratio, args.length * (fontSize / 2) * pixel_ratio, fontSize * lineHeight * pixel_ratio)
+                ctx.fillRect(cursorPos[1] * drawWidth, cursorPos[0] * drawHeight, args.length * drawWidth, drawHeight)
             }
 
             ctx.font = (fontSize * pixel_ratio) + "px InconsolataforPowerline Nerd Font"
@@ -893,12 +909,35 @@ class Editor {
                 ctx.fillStyle = this.state.editor.fg;
             }
             if (text.trim()) {
-                if (drawWidth != ctx.measureText("a").width * text.length) {
-                    text.split("").forEach((char, i) => {
-                        ctx.fillText(char, (cursorPos[1] + i) * (fontSize / 2) * pixel_ratio, (cursorPos[0] + 1) * fontSize * lineHeight * pixel_ratio - ((fontSize * (lineHeight - 1) / 2 + 2.5) * pixel_ratio))
-                    })
+                if (textDrawWidth != ctx.measureText("a").width * text.length) {
+                    if (text.length == 1) {
+                        console.log("text is", text, cursorPos[0], cursorPos[1])
+                        ctx.clearRect(
+                            (cursorPos[1] + 1) * drawWidth,
+                            cursorPos[0] * drawHeight,
+                            drawWidth,
+                            drawHeight)
+                        ctx.fillText(
+                            text,
+                            (cursorPos[1]) * drawWidth,
+                            (cursorPos[0] + 1) * drawHeight - ((fontSize * (lineHeight - 1) / 2 + 2.5) * pixel_ratio)
+                        )
+                        if (this.state.editor.highlight.background != undefined) {
+                            ctx.fillStyle = this.state.editor.highlight.background;
+                            ctx.fillRect(
+                                (cursorPos[1] + 1) * drawWidth,
+                                cursorPos[0] * drawHeight,
+                                drawWidth,
+                                drawHeight
+                            )
+                        }
+                    } else {
+                        text.split("").forEach((char, i) => {
+                            ctx.fillText(char, (cursorPos[1] + i) * drawWidth, (cursorPos[0] + 1) * drawHeight - ((fontSize * (lineHeight - 1) / 2 + 2.5) * pixel_ratio))
+                        })
+                    }
                 } else {
-                    ctx.fillText(text, cursorPos[1] * (fontSize / 2) * pixel_ratio, (cursorPos[0] + 1) * fontSize * lineHeight * pixel_ratio - ((fontSize * (lineHeight - 1) / 2 + 2.5) * pixel_ratio))
+                    ctx.fillText(text, cursorPos[1] * drawWidth, (cursorPos[0] + 1) * drawHeight - ((fontSize * (lineHeight - 1) / 2 + 2.5) * pixel_ratio))
                 }
             }
             // console.log("ctx filltext", wincanvasId, text, cursorPos[1] * 7, (cursorPos[0] + 1) * 14)

@@ -8,7 +8,7 @@ class Cursor extends Component {
 
     render() {
         const { editor, left, top, padding, mode } = this.props
-        var { lineHeight, paddingTop, lengthShift } = this.props
+        var { drawHeight, lineHeight, paddingTop, lengthShift } = this.props
         if (paddingTop == undefined) {
             paddingTop = 0
         }
@@ -20,17 +20,20 @@ class Cursor extends Component {
         if (lineHeight == undefined) {
             lineHeight = editor.lineHeight
         }
+        if (drawHeight == undefined) {
+            drawHeight = editor.drawHeight
+        }
         var fg = editor.fg
 
         var style = {
-            width: fontSize / 2 - 0.5,
-            height: fontSize * lineHeight - lengthShift,
+            width: editor.drawWidth - 0.5,
+            height: drawHeight - lengthShift,
             position: "absolute",
             left: left * fontSize / 2 - padding,
             zIndex: 1300,
         }
         if (top != undefined) {
-            style.top = top * fontSize * lineHeight + paddingTop + lengthShift / 2
+            style.top = top * drawHeight + paddingTop + lengthShift / 2
         }
 
 

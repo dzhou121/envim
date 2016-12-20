@@ -21,7 +21,7 @@ class Popupmenu extends Component {
             position: "absolute",
             zIndex: 100,
             top: (pos[0] + 1) * 14 * 1.5,
-            left: (pos[1] + 1) * 7 - 7,
+            left: (pos[1] + 1) * 7 - 4,
         }
         var iconStyle = {
             backgroundColor: "#658d30",
