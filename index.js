@@ -211,6 +211,34 @@ function initEditor() {
                 remote.getCurrentWindow().close()
             })
 
+            var dragging = null
+            var wheel_scrolling = new ScreenWheel(editor)
+            document.addEventListener("mousedown", function(e) {
+                dragging = new ScreenDrag(editor);
+                nvim.input(dragging.start(e))
+            })
+
+            document.addEventListener("mouseup", function(e) {
+                if (dragging != null) {
+                    nvim.input(dragging.end(e))
+                    dragging = null
+                }
+            })
+
+            document.addEventListener("mousemove", function(e) {
+                if (dragging != null) {
+                    nvim.input(dragging.drag(e))
+                }
+            })
+
+            document.addEventListener("wheel", function(e) {
+                nvim.input(wheel_scrolling.handleEvent(e))
+            })
+
+            document.addEventListener("click", function(e) {
+                console.log("click", e)
+            })
+
             document.addEventListener('keydown', function(e) {
                 var key = e.key
                 // console.log("keydown", getVimSpecialCharFromKey(e))
@@ -982,6 +1010,7 @@ class Editor {
             destRow = scroll - count
             height = height - scroll + count
         }
+        // console.log("scroll", startRow, destRow, height)
 
         var wincanvasId = "wincanvas" + winId
         var c = document.getElementById(wincanvasId)
@@ -1002,18 +1031,16 @@ class Editor {
                 0, width, height
             );
 
-            ctx.clearRect(0, scroll * fontSize * lineHeight * pixel_ratio, width, (win.get("height") - scroll) * fontSize * lineHeight * pixel_ratio)
+            ctx.clearRect(
+                0,
+                scroll * fontSize * lineHeight * pixel_ratio,
+                width,
+                (win.get("height") - scroll) * fontSize * lineHeight * pixel_ratio)
+
             ctx.drawImage(buffer,
                 0, destY, width, height)
 
             return
-            const captured = ctx.getImageData(
-                0, startY, width, height
-            )
-            ctx.clearRect(0, 0, width, win.get("height") * fontSize * lineHeight * pixel_ratio)
-            ctx.putImageData(
-                captured, 0, destY
-            );
         }
         return
         var lines = Immutable.List()
@@ -1324,7 +1351,7 @@ class Editor {
     win_set_scroll_region(args) {
         // console.log("set scroll region")
         // console.log(args[0])
-        this.state.editor.scroll = args[0]
+        this.state.editor.scroll = args[0][0]
     }
 
     setScrollRegion(args) {
@@ -1487,3 +1514,146 @@ function getVimSpecialCharFromKey(event) {
             default:             return null;
         }
     }
+
+const MouseButtonKind = [ 'Left', 'Middle', 'Right' ];
+
+class ScreenDrag {
+
+    constructor(editor) {
+        this.line = 0;
+        this.col = 0;
+        this.editor = editor
+    }
+
+    static buildInputOf(e, type, line, col) {
+        let seq = '<';
+        if (e.ctrlKey) {
+            seq += 'C-';
+        }
+        if (e.altKey) {
+            seq += 'A-';
+        }
+        if (e.shiftKey) {
+            seq += 'S-';
+        }
+        seq += MouseButtonKind[e.button] + type + '>';
+        seq += `<${col},${line}>`;
+        return seq;
+    }
+
+    start(down_event) {
+        down_event.preventDefault();
+        [this.line, this.col] = this.getPos(down_event);
+        console.log('Drag start', down_event, this.line, this.col);
+        const input = ScreenDrag.buildInputOf(down_event, 'Mouse', this.line, this.col);
+        // log.debug('Mouse input: ' + input);
+        return input;
+    }
+
+    drag(move_event) {
+        const [line, col] = this.getPos(move_event);
+        if (line === this.line && col === this.col) {
+            return null;
+        }
+        move_event.preventDefault();
+        // log.debug('Drag continue', move_event, line, col);
+        const input = ScreenDrag.buildInputOf(move_event, 'Drag', line, col);
+        this.line = line;
+        this.col = col;
+        // log.debug('Mouse input: ' + input);
+        return input;
+    }
+
+    end(up_event) {
+        up_event.preventDefault();
+
+        [this.line, this.col] = this.getPos(up_event);
+        console.log('Drag end', up_event, this.line, this.col);
+
+        const input = ScreenDrag.buildInputOf(up_event, 'Release', this.line, this.col);
+        console.log('Mouse input: ' + input);
+        return input;
+    }
+
+    getPos(e) {
+        return [
+            Math.floor((e.clientY - this.editor.tabHeight) / (this.editor.fontSize * editor.lineHeight)),
+            Math.floor(e.clientX / (this.editor.fontSize / 2)),
+        ];
+    }
+}
+
+class ScreenWheel {
+
+    constructor(editor) {
+        this.editor = editor
+        this.reset();
+    }
+
+    handleEvent(e) {
+        if ((this.shift === undefined && this.ctrl === undefined) ||
+            (this.shift !== e.shiftKey || this.ctrl !== e.ctrlKey)) {
+            // Note:
+            // Initialize at first or reset on modifier change
+            this.reset(e.shiftKey, e.ctrlKey);
+        }
+
+        this.x += e.deltaX;
+        this.y += e.deltaY;
+
+        const scroll_x = Math.round(this.x / (editor.fontSize / 2) / 6);
+        const scroll_y = Math.round(this.y / (editor.fontSize * editor.lineHeight) / 3);
+
+        if (scroll_x === 0 && scroll_y === 0) {
+            // Note: At least 3 lines or 6 columns are needed to scroll screen
+            return '';
+        }
+        var line
+        var col
+        [line, col] = this.getPos(e)
+
+        const input = this.getInput(scroll_x, scroll_y, line, col);
+        // log.debug(`Scroll (${scroll_x}, ${scroll_y})`);
+        this.reset();
+        return input;
+    }
+
+    reset(shift, ctrl) {
+        this.x = 0;
+        this.y = 0;
+        this.shift = shift;
+        this.ctrl = ctrl;
+    }
+
+    getDirection(scroll_x, scroll_y) {
+        if (scroll_y !== 0) {
+            return scroll_y > 0 ? 'Down' : 'Up';
+        } else if (scroll_x !== 0) {
+            return scroll_x > 0 ? 'Left' : 'Right';
+        } else {
+            // Note: Never reach here
+            log.error('Null scrolling');
+            return '';
+        }
+    }
+
+    getInput(scroll_x, scroll_y, line, col) {
+        let seq = '<';
+        if (this.ctrl) {
+            seq += 'C-';
+        }
+        if (this.shift) {
+            seq += 'S-';
+        }
+        seq += `ScrollWheel${this.getDirection(scroll_x, scroll_y)}>`;
+        seq += `<${col},${line}>`; // This is really needed?
+        return seq;
+    }
+
+    getPos(e) {
+        return [
+            Math.floor((e.clientY - this.editor.tabHeight) / (this.editor.fontSize * editor.lineHeight)),
+            Math.floor(e.clientX / (this.editor.fontSize / 2)),
+        ];
+    }
+}
