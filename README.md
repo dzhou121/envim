@@ -4,4 +4,9 @@ This project is currectly a proof of concept of PR https://github.com/neovim/neo
 
 It uses Electron and React, and each window is a canvas.
 
-To run this project, you would need to change the nvim binary path in index.js, and the nvim binary needs to be built with this PR. 
+To run this project, you would need to change the nvim binary path in index.js, and the nvim binary needs to be built with this PR. And run:
+
+```
+$> npm install
+$> electron .
+```

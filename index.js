@@ -2,8 +2,6 @@ import * as neovimClient from 'neovim-client'
 import {spawn } from 'child_process'
 import {remote} from 'electron';
 import Immutable from 'immutable'
-import * as Promise from 'bluebird'
-import * as _ from 'lodash'
 import React from 'react';
 import ReactDOM from 'react-dom';
 import ReadWriteLock from 'rwlock'
@@ -21,6 +19,7 @@ var uniqueId = 0
 var lock = new ReadWriteLock()
 var hideEmsg
 var hideMsg
+var hideCursorMsg
 
 var editor = {
     emsg: "",
@@ -335,7 +334,8 @@ class Editor {
     }
 
     parseArgs(args) {
-        this.state.editor.cursormsg = ""
+        this.cursormsgSet = false
+        this.cursorMoved = false
         args.map((arg, index) => {
             var e = arg[0]
             // console.log(e)
@@ -407,6 +407,7 @@ class Editor {
                     break
                 case 'win_put':
                     // console.log("win_put")
+                    this.cursorMoved = true
                     this.win_put(arg.slice(1))
                     break
                 case 'win_status_line':
@@ -415,6 +416,7 @@ class Editor {
                     break
                 case 'win_cursor_goto':
                     // console.log("win_cursor_goto")
+                    this.cursorMoved = true
                     this.win_cursor_goto(arg.slice(1))
                     break
                 case 'popupmenu_show':
@@ -474,6 +476,14 @@ class Editor {
                     break
             }
         })
+        if (!this.cursormsgSet && this.cursorMoved && this.state.editor.cursormsg != "") {
+            var self = this
+            clearTimeout(hideCursorMsg)
+            hideCursorMsg = setTimeout(function() {
+                self.state.editor.cursormsg = ""
+                self.update()
+            }, 100)
+        }
         this.update()
         this.release()
     }
@@ -740,7 +750,9 @@ class Editor {
         var self = this
         var msg = arg[0]
         if (msg.startsWith("__cursor__")) {
+            clearTimeout(hideCursorMsg)
             this.state.editor.cursormsg = msg.slice(10)
+            this.cursormsgSet = true
         } else {
             clearTimeout(hideMsg)
             this.state.editor.msg = arg[0]
@@ -824,6 +836,9 @@ class Editor {
                 width: this.state.editor.width,
                 height: this.state.editor.height,
             })
+        }
+        if (cursorRow >= win.get('height') || cursorCol >= win.get("width")) {
+            return
         }
         win = win.set("cursorPos", [cursorRow, cursorCol])
         this.state.editor.cursorWin = winId
@@ -911,7 +926,7 @@ class Editor {
             if (text.trim()) {
                 if (textDrawWidth != ctx.measureText("a").width * text.length) {
                     if (text.length == 1) {
-                        console.log("text is", text, cursorPos[0], cursorPos[1])
+                        // console.log("text is", text, cursorPos[0], cursorPos[1])
                         ctx.clearRect(
                             (cursorPos[1] + 1) * drawWidth,
                             cursorPos[0] * drawHeight,
