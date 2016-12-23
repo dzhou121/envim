@@ -11,6 +11,7 @@ import Cmd from './components/Cmd'
 import Popupmenu from './components/Popupmenu'
 import Emsg from './components/Emsg'
 import Msg from './components/Msg'
+import DocMsg from './components/DocMsg'
 import Tab from './components/Tab'
 import StatusLine from './components/Statusline'
 
@@ -25,6 +26,9 @@ var editor = {
     emsg: "",
     msg: "",
     cursormsg: "",
+    docmsg: "",
+    docpos: [],
+    doccom: 0,
     cmdline: "",
     wildmenu: [],
     wildmenuMatch: -1,
@@ -130,6 +134,7 @@ var EnvimEditor = React.createClass({
         }
         var cursorHtml
         var cursorMsgHtml
+        var docMsgHtml
         if (wins.get(editor.curWin)) {
             var win = wins.get(editor.curWin)
             var pos = win.get("cursorPos")
@@ -159,6 +164,20 @@ var EnvimEditor = React.createClass({
                     }
                     cursorMsgHtml = <div className="linter" style={cursorMsgStyle}><span>{editor.cursormsg}</span></div>
                 }
+                if (editor.docmsg) {
+                    var docMsgStyle = {
+                        position: "absolute",
+                        left: (pos[1] + win.get("col")) * (fontSize / 2) - padding,
+                        bottom: ((win.get("height") - pos[0]) + win.get("row")) * fontSize * lineHeight,
+                        padding: "4px 6px 4px 6px",
+                        maxWidth: 400,
+                        backgroundColor: "#1f2326",
+                        color: editor.fg,
+                        border: "1px solid #000",
+                        zIndex: 1300,
+                    }
+                    docMsgHtml = <div className="doc" style={docMsgStyle}><span>{editor.docmsg}</span></div>
+                }
             }
         }
 
@@ -184,6 +203,7 @@ var EnvimEditor = React.createClass({
                 {winsElement}
                 {cursorHtml}
                 {cursorMsgHtml}
+                <DocMsg editor={editor} />
                 <div style={msgStyle}>
                   {emsgHtml}
                   {msgHtml}
@@ -202,7 +222,7 @@ ReactDOM.render(
 
 function initEditor() {
     // console.log("now init editor")
-        var nvim_proc = spawn('/Users/Lulu/neovim/build/bin/nvim', ['./index.js', '--embed'], {})
+    var nvim_proc = spawn('/Users/Lulu/neovim/build/bin/nvim', ['/Users/Lulu/go/src/tardis/transport/tcp.go', '--embed'], {})
     // console.log(neovimClient);
         neovimClient.default(nvim_proc.stdin, nvim_proc.stdout, function (err, nvim) {
             // console.log(err, nvim)
@@ -753,6 +773,20 @@ class Editor {
             clearTimeout(hideCursorMsg)
             this.state.editor.cursormsg = msg.slice(10)
             this.cursormsgSet = true
+        } else if (msg.startsWith("__doc__")) {
+            this.state.editor.docmsg = msg.slice(7)
+        } else if (msg.startsWith("__docpos__")) {
+            var docpos = msg.slice(10)
+            docpos = docpos.split(",")
+            const win = editor.wins.get(editor.curWin)
+            const pos = win.get("cursorPos")
+            this.state.editor.docpos = [
+                parseInt(docpos[0]) + pos[0],
+                parseInt(docpos[1]) + pos[1],
+            ]
+            console.log(this.state.editor.docpos)
+        } else if (msg.startsWith("__doccom__")) {
+            this.state.editor.doccom = parseInt(msg.slice(10))
         } else {
             clearTimeout(hideMsg)
             this.state.editor.msg = arg[0]

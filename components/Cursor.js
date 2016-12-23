@@ -1,5 +1,4 @@
 import React, { Component } from 'react'
-import * as _ from 'lodash'
 
 class Cursor extends Component {
     constructor(props, context) {
